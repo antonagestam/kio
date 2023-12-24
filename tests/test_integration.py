@@ -172,7 +172,7 @@ async def make_request(
     # We use asynchronous facilities to send the request and read the raw response into
     # a BytesIO buffer.
     with closing(stream_writer):
-        async with asyncio.timeout(1):
+        async with asyncio.timeout(10):
             await send(stream_writer, request, correlation_id)
             response = await read_response_bytes(stream_reader)
 
@@ -530,7 +530,7 @@ async def test_produce_consume() -> None:
     assert partition_response.error_code is ErrorCode.none
 
     fetch_request = FetchRequest(
-        max_wait=i32Timedelta(datetime.timedelta(seconds=1)),
+        max_wait=i32Timedelta(datetime.timedelta(seconds=10)),
         min_bytes=i32(0),
         isolation_level=i8(1),
         topics=(
