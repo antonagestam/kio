@@ -103,7 +103,9 @@ class Primitive(enum.Enum):
             case Primitive.uuid:
                 hint = "uuid.UUID | None"
             case Primitive.records:
-                return "tuple[bytes | None, ...]"
+                # fixme: assert nullable?
+                # fixme: combine w/ bytes_?
+                hint = "bytes"
             case Primitive.error_code:
                 hint = "ErrorCode"
             case Primitive.timedelta_i32:

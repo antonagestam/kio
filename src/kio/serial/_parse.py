@@ -59,8 +59,10 @@ def get_reader(
             return readers.read_legacy_bytes
         case ("bytes", False, True):
             return readers.read_nullable_legacy_bytes
-        case ("records", _, True):
+        case ("records", False, True):
             return readers.read_nullable_legacy_bytes
+        case ("records", True, True):
+            return readers.read_compact_string_as_bytes_nullable
         case ("uuid", _, True):
             return readers.read_uuid
         case ("bool", _, False):
