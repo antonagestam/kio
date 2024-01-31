@@ -509,7 +509,7 @@ async def test_produce_consume() -> None:
         transactional_id=TransactionalId("foo"),
         # Note that passing 0 here results in server sending no response at all.
         acks=i16(1),
-        timeout=i32Timedelta(datetime.timedelta(seconds=1)),
+        timeout=i32Timedelta.parse(datetime.timedelta(seconds=1)),
         topic_data=(
             TopicProduceData(
                 name=topic_name,
@@ -530,7 +530,7 @@ async def test_produce_consume() -> None:
     assert partition_response.error_code is ErrorCode.none
 
     fetch_request = FetchRequest(
-        max_wait=i32Timedelta(datetime.timedelta(seconds=10)),
+        max_wait=i32Timedelta.parse(datetime.timedelta(seconds=10)),
         min_bytes=i32(0),
         isolation_level=i8(1),
         topics=(
@@ -540,7 +540,7 @@ async def test_produce_consume() -> None:
                     FetchPartition(
                         partition=partition.partition_index,
                         fetch_offset=i64(0),
-                        partition_max_bytes=104_857_600,
+                        partition_max_bytes=i32(104_857_600),
                     ),
                 ),
             ),
@@ -556,4 +556,5 @@ async def test_produce_consume() -> None:
     assert fetch_partition.partition_index == partition.partition_index
     assert fetch_partition.error_code is ErrorCode.none
     # Compare record batch excluding baseOffset, batchLength, and partitionLeaderEpoch.
+    assert fetch_partition.records is not None
     assert fetch_partition.records[16:] == fixtures.record_batch_data_v2[0][16:]
