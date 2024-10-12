@@ -77,7 +77,7 @@ def test_can_serialize_legacy_entity_array(buffer: io.BytesIO) -> None:
     remaining, value = read_legacy_string(remaining)
     assert value == "Child 1"
     value = exhausted(read_legacy_string(remaining))
-    assert value == "Child 1"
+    assert value == "Child 2"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

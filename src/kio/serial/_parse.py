@@ -174,28 +174,25 @@ def entity_reader(
         raise ValueError("Found tagged fields on a non-flexible model")
 
     def read_entity(buffer: memoryview) -> BufferAnd[E]:
-        remaining = buffer
-        del buffer
         # Read regular fields.
         kwargs = {}
         for field, field_reader in field_readers.items():
-            remaining, kwargs[field.name] = field_reader(remaining)
+            buffer, kwargs[field.name] = field_reader(buffer)
 
         # For non-flexible entities we're done here.
         if not entity_type.__flexible__:
-            return remaining, entity_type(**kwargs)
+            return buffer, entity_type(**kwargs)
 
         # Read tagged fields.
-        remaining, num_tagged_fields = readers.read_unsigned_varint(remaining)
+        buffer, num_tagged_fields = readers.read_unsigned_varint(buffer)
         for _ in range(num_tagged_fields):
-            remaining, field_tag = readers.read_unsigned_varint(remaining)
-            remaining, field_length = readers.read_unsigned_varint(remaining)
-            field_buffer = remaining[:field_length]
-            remaining = remaining[field_length:]
+            buffer, field_tag = readers.read_unsigned_varint(buffer)
+            # Ignore field length.
+            buffer, _ = readers.read_unsigned_varint(buffer)
             field, field_reader = tagged_field_readers[field_tag]
-            kwargs[field.name] = field_reader(field_buffer)
+            buffer, kwargs[field.name] = field_reader(buffer)
 
-        return remaining, entity_type(**kwargs)
+        return buffer, entity_type(**kwargs)
 
     if not nullable:
         return read_entity
@@ -203,10 +200,10 @@ def entity_reader(
     # This is undocumented behavior, formalized in KIP-893.
     # https://cwiki.apache.org/confluence/display/KAFKA/KIP-893%3A+The+Kafka+protocol+should+support+nullable+structs
     def read_nullable_entity(buffer: memoryview) -> BufferAnd[E | None]:
-        remaining, marker_int = read_int8(buffer)
+        buffer, marker_int = read_int8(buffer)
         marker = NullableEntityMarker(marker_int)
         return (
-            (remaining, None)
+            (buffer, None)
             if marker is NullableEntityMarker.null
             else read_entity(buffer)
         )

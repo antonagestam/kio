@@ -225,7 +225,7 @@ def test_legacy_string_roundtrip(a: str, b: str) -> None:
 
     remaining, parsed_a = read_legacy_string(buffer.getbuffer())
     assert parsed_a == a
-    parsed_b = exhausted(read_legacy_string(buffer.getbuffer()))
+    parsed_b = exhausted(read_legacy_string(remaining))
     assert parsed_b == b
 
 
