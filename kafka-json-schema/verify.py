@@ -1,8 +1,9 @@
-from typing import Iterator
+import json
+import pathlib
+
+from collections.abc import Iterator
 
 from jsonschema import validate
-import pathlib
-import json
 
 
 def read_strip_comments(path: pathlib.Path) -> bytes:

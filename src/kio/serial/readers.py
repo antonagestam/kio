@@ -4,7 +4,8 @@ import datetime
 import struct
 
 from collections.abc import Callable
-from typing import Final, Generator
+from collections.abc import Generator
+from typing import Final
 from typing import TypeAlias
 from typing import TypeVar
 from uuid import UUID
@@ -231,7 +232,9 @@ def compact_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]
         remaining, length = read_compact_array_length(buffer)
         if length == -1:
             return remaining, None
-        return _materialize_and_return(_read_length_items(item_reader, length, remaining))
+        return _materialize_and_return(
+            _read_length_items(item_reader, length, remaining)
+        )
 
     return read_compact_array
 
@@ -241,7 +244,9 @@ def legacy_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
         remaining, length = read_legacy_array_length(buffer)
         if length == -1:
             return remaining, None
-        return _materialize_and_return(_read_length_items(item_reader, length, remaining))
+        return _materialize_and_return(
+            _read_length_items(item_reader, length, remaining)
+        )
 
     return read_compact_array
 

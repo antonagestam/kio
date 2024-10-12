@@ -1,7 +1,11 @@
 from __future__ import annotations
-from typing import Mapping, TypeVar, Final, Iterator, Sequence, TypeAlias, \
-    Callable, Generic, ClassVar, assert_type
-from dataclasses import dataclass, field, Field
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Final
+from typing import Generic
+from typing import TypeVar
+from typing import assert_type
 
 from kio._utils import DataclassInstance
 
@@ -27,10 +31,7 @@ class SimpleMappingDescriptor(Generic[K, V]):
 
     def __call__(self) -> dict[K, V]:
         source = getattr(instance, self._field_name)
-        return {
-            getattr(value, self._map_key): value
-            for value in source
-        }
+        return {getattr(value, self._map_key): value for value in source}
 
     def __get__(
         self,

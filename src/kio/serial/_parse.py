@@ -1,6 +1,5 @@
 from dataclasses import Field
 from dataclasses import fields
-from typing import IO
 from typing import Literal
 from typing import TypeVar
 from typing import assert_never
@@ -19,7 +18,8 @@ from ._introspect import get_field_tag
 from ._introspect import get_schema_field_type
 from ._introspect import is_optional
 from ._shared import NullableEntityMarker
-from .readers import read_int8, BufferAnd
+from .readers import BufferAnd
+from .readers import read_int8
 
 
 def get_reader(

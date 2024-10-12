@@ -7,7 +7,6 @@ import uuid
 from dataclasses import dataclass
 from dataclasses import field
 from io import BytesIO
-from typing import IO
 from typing import ClassVar
 from typing import final
 

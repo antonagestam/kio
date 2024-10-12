@@ -33,7 +33,7 @@ from kio.static.protocol import Entity
 
 from .hypothesis import configure_hypothesis
 
-pytest.register_assert_rewrite('tests.read_exhausted')
+pytest.register_assert_rewrite("tests.read_exhausted")
 
 configure_hypothesis()
 

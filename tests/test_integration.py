@@ -51,7 +51,8 @@ from kio.schema.types import TopicName
 from kio.schema.types import TransactionalId
 from kio.serial import entity_reader
 from kio.serial import entity_writer
-from kio.serial.readers import read_int32, BufferAnd
+from kio.serial.readers import BufferAnd
+from kio.serial.readers import read_int32
 from kio.serial.writers import Writable
 from kio.serial.writers import write_int32
 from kio.static.constants import uuid_zero
@@ -183,7 +184,11 @@ async def make_request(
     # After this point, the connection is closed, and we're synchronously reading the
     # response from the in-memory buffer.
     with response_bytes as open_message_buffer:
-        remaining, response = parse_response(open_message_buffer, response_type, correlation_id,)
+        remaining, response = parse_response(
+            open_message_buffer,
+            response_type,
+            correlation_id,
+        )
         assert remaining == b""
 
     return response

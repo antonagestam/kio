@@ -1,8 +1,18 @@
 from __future__ import annotations
-from typing import Mapping, TypeVar, Final, Iterator, Sequence, TypeAlias, \
-    Callable, Generic, ClassVar
-from dataclasses import dataclass, field, Field
+
 import operator
+
+from collections.abc import Callable
+from collections.abc import Iterator
+from collections.abc import Mapping
+from collections.abc import Sequence
+from dataclasses import Field
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Final
+from typing import Generic
+from typing import TypeAlias
+from typing import TypeVar
 
 from kio._utils import DataclassInstance
 
@@ -15,8 +25,10 @@ def t_mapper(t: type[T], mapper: Mapper[object, object]) -> Mapper[object, T]:
         if not isinstance(key, t):
             raise ValueError(
                 f"Value mapped by {mapper.__qualname__} did not return value of type "
-                f"{t.__qualname__}")
+                f"{t.__qualname__}"
+            )
         return key
+
     return map_t
 
 
@@ -62,6 +74,7 @@ class LazyMapView(Mapping[K, V]):
     >>> dict(lm)
     {'a': E(k='a', v=1), 'b': E(k='b', v=2), 'c': E(k='c', v=3)}
     """
+
     __slots__ = ("_mapper", "_source", "_iter", "_materialized")
 
     def __init__(
@@ -116,6 +129,7 @@ class LazyMapView(Mapping[K, V]):
         for key, _ in self._consume():
             yield key
 
+
 class MappingDescriptor(Generic[K, V]):
     __slots__ = ("_field_name", "_map_key", "_key_type")
 
@@ -162,14 +176,15 @@ class SimpleMappingDescriptor(Generic[K, V]):
     ) -> Callable[[], dict[K, V]]:
         assert isinstance(instance, F), type(instance)
 
-
         def build_map() -> dict[K, V]:
             source = getattr(instance, self._source_field.name)
             return {
                 getattr(value, self._source_field.metadata["map_key"]): value
                 for value in source
             }
+
         return build_map
+
 
 @dataclass(frozen=True)
 class E:

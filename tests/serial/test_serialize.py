@@ -386,7 +386,7 @@ def test_serialize_complex_entity(buffer: io.BytesIO) -> None:
             remaining, leader_id = read_int32(remaining)
             assert leader_id == 2345
             remaining, leader_epoch = read_int32(remaining)
-            assert leader_epoch ==  6445678
+            assert leader_epoch == 6445678
             remaining, replica_nodes = read_compact_array_length(remaining)
             assert replica_nodes == 2
             remaining, replica_node = read_int32(remaining)

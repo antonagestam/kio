@@ -1,9 +1,20 @@
 import datetime
+
+from typing import TypeAlias
+from typing import TypeVar
 from uuid import UUID
 
 from kio.schema.errors import ErrorCode
-from kio.static.primitive import i8, i16, i32, i64, u8, u16, u32, u64, f64, TZAware
-from typing import TypeVar, TypeAlias
+from kio.static.primitive import TZAware
+from kio.static.primitive import f64
+from kio.static.primitive import i8
+from kio.static.primitive import i16
+from kio.static.primitive import i32
+from kio.static.primitive import i64
+from kio.static.primitive import u8
+from kio.static.primitive import u16
+from kio.static.primitive import u32
+from kio.static.primitive import u64
 
 T = TypeVar("T")
 _Result: TypeAlias = tuple[T, int]
@@ -11,148 +22,109 @@ _Result: TypeAlias = tuple[T, int]
 def read_boolean(
     bytes: bytes,
     offset: int,
-) -> _Result[bool]:
-    ...
-
+) -> _Result[bool]: ...
 def read_int8(
     bytes: bytes,
     offset: int,
-) -> _Result[i8]:
-    ...
-
+) -> _Result[i8]: ...
 def read_int16(
     bytes: bytes,
     offset: int,
-) -> _Result[i16]:
-    ...
-
+) -> _Result[i16]: ...
 def read_int32(
     bytes: bytes,
     offset: int,
-) -> _Result[i32]:
-    ...
+) -> _Result[i32]: ...
 def read_int64(
     bytes: bytes,
     offset: int,
-) -> _Result[i64]:
-    ...
+) -> _Result[i64]: ...
 def read_uint8(
     bytes: bytes,
     offset: int,
-) -> _Result[u8]:
-    ...
+) -> _Result[u8]: ...
 def read_uint16(
     bytes: bytes,
     offset: int,
-) -> _Result[u16]:
-    ...
+) -> _Result[u16]: ...
 def read_uint32(
     bytes: bytes,
     offset: int,
-) -> _Result[u32]:
-    ...
+) -> _Result[u32]: ...
 def read_uint64(
     bytes: bytes,
     offset: int,
-) -> _Result[u64]:
-    ...
+) -> _Result[u64]: ...
 def read_unsigned_varint(
     bytes: bytes,
     offset: int,
-) -> _Result[int]:
-    ...
-
+) -> _Result[int]: ...
 def read_float64(
     bytes: bytes,
     offset: int,
-) -> _Result[f64]:
-    ...
-
+) -> _Result[f64]: ...
 def read_compact_string_as_bytes(
     bytes: bytes,
     offset: int,
-) -> _Result[bytes]:
-    ...
-
+) -> _Result[bytes]: ...
 def read_compact_string_as_bytes_nullable(
     bytes: bytes,
     offset: int,
-) -> _Result[bytes | None]:
-    ...
-
+) -> _Result[bytes | None]: ...
 def read_compact_string(
     bytes: bytes,
     offset: int,
-) -> _Result[str]:
-    ...
+) -> _Result[str]: ...
 def read_compact_string_nullable(
     bytes: bytes,
     offset: int,
-) -> _Result[str | None]:
-    ...
-
-
-
+) -> _Result[str | None]: ...
 def read_legacy_bytes(
     bytes: bytes,
     offset: int,
-) -> _Result[bytes]:
-    ...
+) -> _Result[bytes]: ...
 def read_nullable_legacy_bytes(
     bytes: bytes,
     offset: int,
-) -> _Result[bytes | None]:
-    ...
+) -> _Result[bytes | None]: ...
 def read_legacy_string(
     bytes: bytes,
     offset: int,
-) -> _Result[str]:
-    ...
+) -> _Result[str]: ...
 def read_nullable_legacy_string(
     bytes: bytes,
     offset: int,
-) -> _Result[str | None]:
-    ...
-
-
+) -> _Result[str | None]: ...
 def read_legacy_array_length(
     bytes: bytes,
     offset: int,
-) -> _Result[i32]:
-    ...
+) -> _Result[i32]: ...
 def read_compact_array_length(
     bytes: bytes,
     offset: int,
 ) -> _Result[int]:  # todo: type as uvarint
     ...
-
 def read_uuid(
     bytes: bytes,
     offset: int,
-) -> _Result[UUID]:
-    ...
+) -> _Result[UUID]: ...
 def read_error_code(
     bytes: bytes,
     offset: int,
-) -> _Result[ErrorCode]:
-    ...
+) -> _Result[ErrorCode]: ...
 def read_timedelta_i32(
     bytes: bytes,
     offset: int,
-) -> _Result[datetime.timedelta]:
-    ...
+) -> _Result[datetime.timedelta]: ...
 def read_timedelta_i64(
     bytes: bytes,
     offset: int,
-) -> _Result[datetime.timedelta]:
-    ...
+) -> _Result[datetime.timedelta]: ...
 def read_datetime_i64(
     bytes: bytes,
     offset: int,
-) -> _Result[TZAware]:
-    ...
+) -> _Result[TZAware]: ...
 def read_nullable_datetime_i64(
     bytes: bytes,
     offset: int,
-) -> _Result[TZAware|None]:
-    ...
+) -> _Result[TZAware | None]: ...
