@@ -6,6 +6,7 @@ import uuid
 
 from dataclasses import dataclass
 from dataclasses import field
+from io import BytesIO
 from typing import IO
 from typing import ClassVar
 from typing import final
@@ -49,6 +50,7 @@ from kio.static.constants import uuid_zero
 from kio.static.primitive import TZAware
 from kio.static.primitive import i8
 from kio.static.primitive import i16
+from tests.read_exhausted import exhausted
 
 
 class BufferUnderflowContract:
@@ -56,16 +58,15 @@ class BufferUnderflowContract:
     valid_serialization: bytes
 
     @classmethod
-    def read(cls, buffer: IO[bytes]) -> object:
-        return cls.reader(buffer)
+    def read(cls, buffer: BytesIO) -> object:
+        return cls.reader(buffer.getbuffer())
 
     @final
     def test_raises_buffer_underflow_when_not_enough_bytes_for_value(
         self,
-        buffer: IO[bytes],
+        buffer: BytesIO,
     ) -> None:
         buffer.write(self.valid_serialization[:-1])
-        buffer.seek(0)
 
         with pytest.raises(BufferUnderflow):
             self.read(buffer)
@@ -77,10 +78,9 @@ class LengthBufferUnderflowContract(BufferUnderflowContract):
     @final
     def test_raises_buffer_underflow_when_not_enough_bytes_for_length(
         self,
-        buffer: IO[bytes],
+        buffer: BytesIO,
     ) -> None:
         buffer.write(self.valid_serialization[: self.length_num_bytes - 1])
-        buffer.seek(0)
 
         with pytest.raises(BufferUnderflow):
             self.read(buffer)
@@ -95,25 +95,22 @@ class IntReaderContract:
     zero_as_bytes: bytes
 
     @classmethod
-    def read(cls, buffer: IO[bytes]) -> int:
-        return cls.reader(buffer)
+    def read(cls, buffer: BytesIO) -> int:
+        return exhausted(cls.reader(buffer.getbuffer()))
 
     @final
     def test_can_read_lower_limit_sync(self, buffer: io.BytesIO) -> None:
         buffer.write(self.lower_limit_as_bytes)
-        buffer.seek(0)
         assert self.lower_limit == self.read(buffer)
 
     @final
     def test_can_read_upper_limit_sync(self, buffer: io.BytesIO) -> None:
         buffer.write(self.upper_limit_as_bytes)
-        buffer.seek(0)
         assert self.upper_limit == self.read(buffer)
 
     @final
     def test_can_read_zero_sync(self, buffer: io.BytesIO) -> None:
         buffer.write(self.zero_as_bytes)
-        buffer.seek(0)
         assert self.read(buffer) == 0
 
 
@@ -207,7 +204,6 @@ class TestReadUnsignedVarint(IntReaderContract, BufferUnderflowContract):
     def test_raises_value_error_for_too_long_value(self, buffer: io.BytesIO) -> None:
         for _ in range(5):
             buffer.write(0b10000001.to_bytes(1, "little"))
-        buffer.seek(0)
         with pytest.raises(ValueError, match=r"^Varint is too long"):
             self.read(buffer)
 
@@ -228,7 +224,6 @@ class TestReadUnsignedVarint(IntReaderContract, BufferUnderflowContract):
         expected: int,
     ) -> None:
         buffer.write(byte_value)
-        buffer.seek(0)
         assert self.read(buffer) == expected
 
 
@@ -250,7 +245,6 @@ class TestReadFloat64(BufferUnderflowContract):
     )
     def test_can_read_value(self, buffer: io.BytesIO, value: float) -> None:
         buffer.write(struct.pack(">d", value))
-        buffer.seek(0)
         assert self.read(buffer) == value
 
 
@@ -264,7 +258,6 @@ class TestReadCompactStringAsBytes(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(0b00000000.to_bytes(1, "little"))
-        buffer.seek(0)
         with pytest.raises(UnexpectedNull):
             self.read(buffer)
 
@@ -276,7 +269,6 @@ class TestReadCompactStringAsBytes(LengthBufferUnderflowContract):
         byte_length = len(value) + 1  # string length is offset by one
         buffer.write(byte_length.to_bytes(1, "little"))
         buffer.write(value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -290,7 +282,6 @@ class TestReadCompactStringAsBytesNullable(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(0b00000000.to_bytes(1, "little"))
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_bytes_sync(
@@ -301,7 +292,6 @@ class TestReadCompactStringAsBytesNullable(LengthBufferUnderflowContract):
         byte_length = len(value) + 1  # string length is offset by one
         buffer.write(byte_length.to_bytes(1, "little"))
         buffer.write(value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -315,7 +305,6 @@ class TestReadCompactString(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write((0).to_bytes(1, "little"))
-        buffer.seek(0)
         with pytest.raises(UnexpectedNull):
             self.read(buffer)
 
@@ -328,7 +317,6 @@ class TestReadCompactString(LengthBufferUnderflowContract):
         byte_length = len(byte_value) + 1  # string length is offset by one
         buffer.write(byte_length.to_bytes(1, "little"))
         buffer.write(byte_value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -342,7 +330,6 @@ class TestReadCompactStringNullable(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write((0).to_bytes(1, "little"))
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_string_sync(
@@ -354,7 +341,6 @@ class TestReadCompactStringNullable(LengthBufferUnderflowContract):
         byte_length = len(byte_value) + 1  # string length is offset by one
         buffer.write(byte_length.to_bytes(1, "little"))
         buffer.write(byte_value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -368,7 +354,6 @@ class TestReadNullableLegacyBytes(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">i", -1))
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_bytes_sync(
@@ -379,7 +364,6 @@ class TestReadNullableLegacyBytes(LengthBufferUnderflowContract):
         byte_length = len(value)
         buffer.write(struct.pack(">i", byte_length))
         buffer.write(value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -393,7 +377,6 @@ class TestReadLegacyString(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">h", -1))
-        buffer.seek(0)
         with pytest.raises(UnexpectedNull):
             self.read(buffer)
 
@@ -406,7 +389,6 @@ class TestReadLegacyString(LengthBufferUnderflowContract):
         byte_length = len(byte_value)
         buffer.write(struct.pack(">h", byte_length))
         buffer.write(byte_value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -420,7 +402,6 @@ class TestReadNullableLegacyString(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">h", -1))
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_string_sync(
@@ -432,7 +413,6 @@ class TestReadNullableLegacyString(LengthBufferUnderflowContract):
         byte_length = len(byte_value)
         buffer.write(struct.pack(">h", byte_length))
         buffer.write(byte_value)
-        buffer.seek(0)
         assert value == self.read(buffer)
 
 
@@ -446,7 +426,6 @@ class TestReadLegacyBytes(LengthBufferUnderflowContract):
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">i", -1))
-        buffer.seek(0)
         with pytest.raises(UnexpectedNull):
             self.read(buffer)
 
@@ -459,7 +438,6 @@ class TestReadLegacyBytes(LengthBufferUnderflowContract):
         byte_length = len(byte_value)
         buffer.write(struct.pack(">i", byte_length))
         buffer.write(byte_value)
-        buffer.seek(0)
         assert byte_value == self.read(buffer)
 
 
@@ -469,13 +447,11 @@ class TestReadUUID(BufferUnderflowContract):
 
     def test_reads_zero_as_none(self, buffer: io.BytesIO) -> None:
         buffer.write(uuid_zero.bytes)
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_uuid4(self, buffer: io.BytesIO) -> None:
         value = uuid.uuid4()
         buffer.write(value.bytes)
-        buffer.seek(0)
         assert self.read(buffer) == value
 
 
@@ -483,20 +459,17 @@ class TestCompactArrayReader:
     def test_can_read_none(self, buffer: io.BytesIO) -> None:
         reader = compact_array_reader(read_int8)
         buffer.write(b"\x00")
-        buffer.seek(0)
-        assert reader(buffer) is None
+        assert exhausted(reader(buffer.getbuffer())) is None
 
     def test_can_read_empty_array(self, buffer: io.BytesIO) -> None:
         reader = compact_array_reader(read_int8)
         buffer.write(b"\x01")
-        buffer.seek(0)
-        assert reader(buffer) == ()
+        assert exhausted(reader(buffer.getbuffer())) == ()
 
     def test_can_read_primitive_array(self, buffer: io.BytesIO) -> None:
         reader = compact_array_reader(read_int8)
         buffer.write(b"\x02\x20")
-        buffer.seek(0)
-        assert reader(buffer) == (32,)
+        assert exhausted(reader(buffer.getbuffer())) == (32,)
 
     def test_can_read_entity_array(self, buffer: io.BytesIO) -> None:
         @dataclass
@@ -514,9 +487,8 @@ class TestCompactArrayReader:
             b"\x08foo bar"  # A.q
             b"\00"  # no tagged fields
         )
-        buffer.seek(0)
 
-        result = reader(buffer)
+        result = exhausted(reader(buffer.getbuffer()))
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)
@@ -528,20 +500,17 @@ class TestLegacyArrayReader:
     def test_can_read_none(self, buffer: io.BytesIO) -> None:
         reader = legacy_array_reader(read_int8)
         buffer.write(b"\xff\xff\xff\xff")
-        buffer.seek(0)
-        assert reader(buffer) is None
+        assert exhausted(reader(buffer.getbuffer())) is None
 
     def test_can_read_empty_array(self, buffer: io.BytesIO) -> None:
         reader = legacy_array_reader(read_int8)
         buffer.write(b"\x00\x00\x00\x00")
-        buffer.seek(0)
-        assert reader(buffer) == ()
+        assert exhausted(reader(buffer.getbuffer())) == ()
 
     def test_can_read_primitive_array(self, buffer: io.BytesIO) -> None:
         reader = legacy_array_reader(read_int8)
         buffer.write(b"\x00\x00\x00\x01\x20")
-        buffer.seek(0)
-        assert reader(buffer) == (32,)
+        assert exhausted(reader(buffer.getbuffer())) == (32,)
 
     def test_can_read_entity_array(self, buffer: io.BytesIO) -> None:
         @dataclass
@@ -558,9 +527,8 @@ class TestLegacyArrayReader:
             b"\x17"  # A.p
             b"\x00\x07foo bar"  # A.q
         )
-        buffer.seek(0)
 
-        result = reader(buffer)
+        result = exhausted(reader(buffer.getbuffer()))
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)
@@ -571,18 +539,16 @@ class TestLegacyArrayReader:
 class TestReadErrorCode:
     def test_raises_buffer_underflow(self, buffer: io.BytesIO) -> None:
         buffer.write(b"\x00")
-        buffer.seek(0)
         with pytest.raises(BufferUnderflow):
-            read_error_code(buffer)
+            read_error_code(buffer.getbuffer())
 
     def test_raises_value_error_for_unknown_error_code(
         self,
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(b"\xff\xfe")
-        buffer.seek(0)
         with pytest.raises(ValueError, match=r"^-2 is not a valid ErrorCode$"):
-            read_error_code(buffer)
+            read_error_code(buffer.getbuffer())
 
     @pytest.mark.parametrize(
         ("buffer_bytes", "expected_code"),
@@ -599,16 +565,14 @@ class TestReadErrorCode:
         expected_code: ErrorCode,
     ) -> None:
         buffer.write(buffer_bytes)
-        buffer.seek(0)
-        assert read_error_code(buffer) is expected_code
+        assert exhausted(read_error_code(buffer.getbuffer())) is expected_code
 
 
 class TestReadTimedeltaI32:
     def test_raises_buffer_underflow(self, buffer: io.BytesIO) -> None:
         buffer.write(b"\x00")
-        buffer.seek(0)
         with pytest.raises(BufferUnderflow):
-            assert read_timedelta_i32(buffer)
+            read_timedelta_i32(buffer.getbuffer())
 
     @pytest.mark.parametrize(
         ("buffer_bytes", "expected"),
@@ -624,16 +588,14 @@ class TestReadTimedeltaI32:
         expected: datetime.timedelta,
     ) -> None:
         buffer.write(buffer_bytes)
-        buffer.seek(0)
-        assert read_timedelta_i32(buffer) == expected
+        assert exhausted(read_timedelta_i32(buffer.getbuffer())) == expected
 
 
 class TestReadTimedeltaI64:
     def test_raises_buffer_underflow(self, buffer: io.BytesIO) -> None:
         buffer.write(b"\x00\x00\x00\x00")
-        buffer.seek(0)
         with pytest.raises(BufferUnderflow):
-            assert read_timedelta_i64(buffer)
+            read_timedelta_i64(buffer.getbuffer())
 
     @pytest.mark.parametrize(
         ("buffer_bytes", "expected"),
@@ -649,8 +611,7 @@ class TestReadTimedeltaI64:
         expected: datetime.timedelta,
     ) -> None:
         buffer.write(buffer_bytes)
-        buffer.seek(0)
-        assert read_timedelta_i64(buffer) == expected
+        assert exhausted(read_timedelta_i64(buffer.getbuffer())) == expected
 
 
 class TestReadDatetimeI64:
@@ -661,17 +622,15 @@ class TestReadDatetimeI64:
     upper_limit_as_bytes = struct.pack(">q", int(upper_limit.timestamp() * 1000))
 
     @classmethod
-    def read(cls, buffer: IO[bytes]) -> TZAware:
-        return cls.reader(buffer)
+    def read(cls, buffer: BytesIO) -> TZAware:
+        return exhausted(cls.reader(buffer.getbuffer()))
 
     def test_can_read_lower_limit(self, buffer: io.BytesIO) -> None:
         buffer.write(self.lower_limit_as_bytes)
-        buffer.seek(0)
         assert self.lower_limit == self.read(buffer)
 
     def test_can_read_upper_limit(self, buffer: io.BytesIO) -> None:
         buffer.write(self.upper_limit_as_bytes)
-        buffer.seek(0)
         assert self.upper_limit == self.read(buffer)
 
     # As -1 is special null marker, also test with -2.
@@ -682,7 +641,6 @@ class TestReadDatetimeI64:
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">q", value))
-        buffer.seek(0)
         with pytest.raises(OutOfBoundValue):
             self.read(buffer)
 
@@ -696,22 +654,19 @@ class TestReadNullableDatetimeI64:
     upper_limit_as_bytes = struct.pack(">q", int(upper_limit.timestamp() * 1000))
 
     @classmethod
-    def read(cls, buffer: IO[bytes]) -> TZAware | None:
-        return cls.reader(buffer)
+    def read(cls, buffer: BytesIO) -> TZAware | None:
+        return exhausted(cls.reader(buffer.getbuffer()))
 
     def test_can_read_null(self, buffer: io.BytesIO) -> None:
         buffer.write(self.null_as_bytes)
-        buffer.seek(0)
         assert self.read(buffer) is None
 
     def test_can_read_lower_limit(self, buffer: io.BytesIO) -> None:
         buffer.write(self.lower_limit_as_bytes)
-        buffer.seek(0)
         assert self.lower_limit == self.read(buffer)
 
     def test_can_read_upper_limit(self, buffer: io.BytesIO) -> None:
         buffer.write(self.upper_limit_as_bytes)
-        buffer.seek(0)
         assert self.upper_limit == self.read(buffer)
 
     def test_raises_out_of_bound_value_for_negative_values(
@@ -719,6 +674,5 @@ class TestReadNullableDatetimeI64:
         buffer: io.BytesIO,
     ) -> None:
         buffer.write(struct.pack(">q", -2))
-        buffer.seek(0)
         with pytest.raises(OutOfBoundValue):
             self.read(buffer)
