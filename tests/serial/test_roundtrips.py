@@ -1,5 +1,6 @@
 import io
 import uuid
+from ast import parse
 
 from typing import TypeVar
 
@@ -57,6 +58,7 @@ from kio.serial.writers import write_uint32
 from kio.serial.writers import write_uint64
 from kio.serial.writers import write_unsigned_varint
 from kio.serial.writers import write_uuid
+from tests.read_exhausted import exhausted
 
 pytestmark = pytest.mark.roundtrip
 
@@ -66,11 +68,11 @@ def test_booleans_roundtrip_sync(a: bool, b: bool) -> None:
     buffer = io.BytesIO()
     write_boolean(buffer, a)
     write_boolean(buffer, b)
-    buffer.seek(0)
-    assert a is read_boolean(buffer)
-    assert b is read_boolean(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_boolean(buffer.getbuffer())
+    assert parsed_a is a
+    parsed_b = exhausted(read_boolean(remaining))
+    assert parsed_b is b
 
 
 _I = TypeVar("_I", bound=int, contravariant=True)
@@ -93,11 +95,11 @@ def create_integer_roundtrip_test(
             buffer = io.BytesIO()
             int_writer(buffer, a)
             int_writer(buffer, b)
-            buffer.seek(0)
-            assert a == int_reader(buffer)
-            assert b == int_reader(buffer)
-            # Make sure buffer is exhausted.
-            assert buffer.read(1) == b"", "buffer not exhausted"
+
+            remaining, parsed_a = int_reader(buffer.getbuffer())
+            assert parsed_a == a
+            parsed_b = exhausted(int_reader(remaining))
+            assert parsed_b == b
 
     return Test
 
@@ -175,11 +177,11 @@ def test_compact_string_roundtrip_sync(a: str, b: str) -> None:
     buffer = io.BytesIO()
     write_compact_string(buffer, a)
     write_compact_string(buffer, b)
-    buffer.seek(0)
-    assert a == read_compact_string(buffer)
-    assert b == read_compact_string(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_compact_string(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_compact_string(remaining))
+    assert parsed_b == b
 
 
 @given(binary(), binary())
@@ -187,33 +189,33 @@ def test_compact_bytes_roundtrip(a: bytes, b: bytes) -> None:
     buffer = io.BytesIO()
     write_compact_string(buffer, a)
     write_compact_string(buffer, b)
-    buffer.seek(0)
-    assert a == read_compact_string_as_bytes(buffer)
-    assert b == read_compact_string_as_bytes(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_compact_string_as_bytes(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_compact_string_as_bytes(remaining))
+    assert parsed_b == b
 
 
 def test_compact_bytes_roundtrip_none() -> None:
     buffer = io.BytesIO()
     write_nullable_compact_string(buffer, None)
     write_nullable_compact_string(buffer, None)
-    buffer.seek(0)
-    assert read_compact_string_as_bytes_nullable(buffer) is None
-    assert read_compact_string_as_bytes_nullable(buffer) is None
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, value = read_compact_string_as_bytes_nullable(buffer.getbuffer())
+    assert value is None
+    value = exhausted(read_compact_string_as_bytes_nullable(remaining))
+    assert value is None
 
 
 def test_compact_string_roundtrip_none() -> None:
     buffer = io.BytesIO()
     write_nullable_compact_string(buffer, None)
     write_nullable_compact_string(buffer, None)
-    buffer.seek(0)
-    assert read_compact_string_nullable(buffer) is None
-    assert read_compact_string_nullable(buffer) is None
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, value = read_compact_string_nullable(buffer.getbuffer())
+    assert value is None
+    value = exhausted(read_compact_string_nullable(remaining))
+    assert value is None
 
 
 @given(text(), text())
@@ -221,11 +223,11 @@ def test_legacy_string_roundtrip(a: str, b: str) -> None:
     buffer = io.BytesIO()
     write_legacy_string(buffer, a)
     write_legacy_string(buffer, b)
-    buffer.seek(0)
-    assert a == read_legacy_string(buffer)
-    assert b == read_legacy_string(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_legacy_string(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_legacy_string(buffer.getbuffer()))
+    assert parsed_b == b
 
 
 @given(text() | none(), text() | none())
@@ -233,11 +235,11 @@ def test_nullable_legacy_string_roundtrip(a: str | None, b: str | None) -> None:
     buffer = io.BytesIO()
     write_nullable_legacy_string(buffer, a)
     write_nullable_legacy_string(buffer, b)
-    buffer.seek(0)
-    assert a == read_nullable_legacy_string(buffer)
-    assert b == read_nullable_legacy_string(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_nullable_legacy_string(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_nullable_legacy_string(remaining))
+    assert parsed_b == b
 
 
 @given(binary(), binary())
@@ -245,11 +247,11 @@ def test_legacy_bytes_roundtrip(a: bytes, b: bytes) -> None:
     buffer = io.BytesIO()
     write_legacy_bytes(buffer, a)
     write_legacy_bytes(buffer, b)
-    buffer.seek(0)
-    assert a == read_legacy_bytes(buffer)
-    assert b == read_legacy_bytes(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_legacy_bytes(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_legacy_bytes(remaining))
+    assert parsed_b == b
 
 
 @given(uuids() | none(), uuids() | none())
@@ -257,11 +259,11 @@ def test_uuid_roundtrip(a: uuid.UUID | None, b: uuid.UUID | None) -> None:
     buffer = io.BytesIO()
     write_uuid(buffer, a)
     write_uuid(buffer, b)
-    buffer.seek(0)
-    assert a == read_uuid(buffer)
-    assert b == read_uuid(buffer)
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    remaining, parsed_a = read_uuid(buffer.getbuffer())
+    assert parsed_a == a
+    parsed_b = exhausted(read_uuid(remaining))
+    assert parsed_b == b
 
 
 @given(from_type(MetadataResponse))
@@ -269,8 +271,6 @@ async def test_flexible_entity_roundtrip(instance: MetadataResponse) -> None:
     buffer = io.BytesIO()
     write_metadata_response = entity_writer(MetadataResponse)
     write_metadata_response(buffer, instance)
-    buffer.seek(0)
-    result = entity_reader(MetadataResponse)(buffer)
-    assert instance == result
-    # Make sure buffer is exhausted.
-    assert buffer.read(1) == b""
+
+    result = exhausted(entity_reader(MetadataResponse)(buffer.getbuffer()))
+    assert result == instance
