@@ -23,6 +23,7 @@ from kio.serial.writers import write_unsigned_varint
 from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import u8
+from tests.read_exhausted import read_exhausted
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -84,9 +85,7 @@ def test_can_parse_tagged_fields(
             tagged_value.value,
         )
 
-    buffer.seek(0)
-
-    assert read_person(buffer) == expected
+    assert read_exhausted(read_person(buffer.getbuffer())) == expected
 
 
 def test_raises_type_error_when_missing_required_tagged_field(
@@ -98,13 +97,11 @@ def test_raises_type_error_when_missing_required_tagged_field(
     # Only write country, omit age.
     write_tagged_field(buffer, 1, write_compact_string, "Borduria")
 
-    buffer.seek(0)
-
     with pytest.raises(
         TypeError,
         match=r"missing 1 required keyword-only argument: 'age'",
     ):
-        read_person(buffer)
+        read_person(buffer.getbuffer())
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -141,13 +138,17 @@ def test_can_serialize_tagged_fields(
 ) -> None:
     entity_writer(Person)(buffer, instance)
 
-    buffer.seek(0)
+    remaining, name = read_compact_string(buffer.getbuffer())
 
-    assert read_compact_string(buffer) == "Almaszout"  # name
+    assert name == "Almaszout"  # name
 
-    num_tagged_values = read_unsigned_varint(buffer)
+    remaining, num_tagged_values = read_unsigned_varint(remaining)
     assert num_tagged_values == len(expected_tags)
-    for tag in expected_tags:
-        assert read_unsigned_varint(buffer) == tag.tag
-        read_unsigned_varint(buffer)  # length
-        assert tag.reader(buffer) == tag.value
+    for expected_tag in expected_tags:
+        remaining, tag = read_unsigned_varint(remaining)
+        assert tag == expected_tag.tag
+        remaining, _ = read_unsigned_varint(remaining)  # length
+        remaining, value = expected_tag.reader(remaining)
+        assert value == expected_tag.value
+
+    assert remaining == b""
