@@ -32,6 +32,7 @@ from kio.serial.writers import write_uuid
 from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import i32
+from tests.read_exhausted import exhausted
 
 
 class TestGetReader:
@@ -149,8 +150,7 @@ def test_can_parse_entity(buffer: io.BytesIO) -> None:
     # tagged fields
     write_empty_tagged_fields(buffer)
 
-    buffer.seek(0)
-    instance = entity_reader(MetadataResponseBrokerV12)(buffer)
+    instance = exhausted(entity_reader(MetadataResponseBrokerV12)(buffer.getbuffer()))
     assert isinstance(instance, MetadataResponseBrokerV12)
 
     assert instance.node_id == 123
@@ -170,8 +170,7 @@ def test_can_parse_legacy_entity(buffer: io.BytesIO) -> None:
     # rack
     write_legacy_string(buffer, "da best")
 
-    buffer.seek(0)
-    instance = entity_reader(MetadataResponseBrokerV5)(buffer)
+    instance = exhausted(entity_reader(MetadataResponseBrokerV5)(buffer.getbuffer()))
     assert isinstance(instance, MetadataResponseBrokerV5)
 
     assert instance.node_id == 123
@@ -250,9 +249,7 @@ def test_can_parse_complex_entity(buffer: io.BytesIO) -> None:
     # main entity tagged fields
     write_empty_tagged_fields(buffer)
 
-    buffer.seek(0)
-
-    instance = entity_reader(MetadataResponse)(buffer)
+    instance = exhausted(entity_reader(MetadataResponse)(buffer.getbuffer()))
     assert isinstance(instance, MetadataResponse)
 
     assert instance.throttle_time == datetime.timedelta(milliseconds=123)
@@ -292,9 +289,8 @@ def test_can_parse_nested_non_array_entity(buffer: io.BytesIO) -> None:
     write_compact_string(buffer, "child name")
     write_empty_tagged_fields(buffer)  # child fields
     write_empty_tagged_fields(buffer)  # parent fields
-    buffer.seek(0)
 
-    instance = entity_reader(UniParent)(buffer)
+    instance = exhausted(entity_reader(UniParent)(buffer.getbuffer()))
 
     assert instance == UniParent(
         name="parent name",
@@ -320,9 +316,8 @@ def test_can_parse_nested_entity_array(buffer: io.BytesIO) -> None:
     write_compact_string(buffer, "second child")
     write_empty_tagged_fields(buffer)  # second child fields
     write_empty_tagged_fields(buffer)  # parent fields
-    buffer.seek(0)
 
-    instance = entity_reader(MultiParent)(buffer)
+    instance = exhausted(entity_reader(MultiParent)(buffer.getbuffer()))
 
     assert instance == MultiParent(
         name="parent name",
@@ -349,13 +344,12 @@ class EmptyLegacy:
 
 def test_can_read_empty_flexible_entity(buffer: io.BytesIO) -> None:
     write_empty_tagged_fields(buffer)
-    buffer.seek(0)
-    instance = entity_reader(EmptyFlexible)(buffer)
+    instance = exhausted(entity_reader(EmptyFlexible)(buffer.getbuffer()))
     assert instance == EmptyFlexible()
 
 
 def test_can_read_empty_legacy_entity(buffer: io.BytesIO) -> None:
-    instance = entity_reader(EmptyLegacy)(buffer)
+    instance = exhausted(entity_reader(EmptyLegacy)(buffer.getbuffer()))
     assert instance == EmptyLegacy()
 
 
@@ -391,9 +385,8 @@ def test_can_read_populated_nested_nullable_entity(buffer: io.BytesIO) -> None:
     write_empty_tagged_fields(buffer)  # child fields
     write_compact_string(buffer, "parent name")
     write_empty_tagged_fields(buffer)  # parent fields
-    buffer.seek(0)
 
-    instance = entity_reader(NestedNullable)(buffer)
+    instance = exhausted(entity_reader(NestedNullable)(buffer.getbuffer()))
 
     assert instance == NestedNullable(
         child=Child(name="child name"),
@@ -405,9 +398,8 @@ def test_can_read_empty_nested_nullable_entity(buffer: io.BytesIO) -> None:
     write_int8(buffer, NullableEntityMarker.null.value)
     write_compact_string(buffer, "parent name")
     write_empty_tagged_fields(buffer)  # parent fields
-    buffer.seek(0)
 
-    instance = entity_reader(NestedNullable)(buffer)
+    instance = exhausted(entity_reader(NestedNullable)(buffer.getbuffer()))
 
     assert instance == NestedNullable(
         child=None,
