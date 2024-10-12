@@ -29,8 +29,11 @@ def test_offset_fetch_response_partitions_roundtrip(
     writer = entity_writer(OffsetFetchResponsePartitions)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_response_partitions(buffer)
+        remaining, result = read_offset_fetch_response_partitions(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -45,8 +48,11 @@ def test_offset_fetch_response_topics_roundtrip(
     writer = entity_writer(OffsetFetchResponseTopics)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_response_topics(buffer)
+        remaining, result = read_offset_fetch_response_topics(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -61,8 +67,11 @@ def test_offset_fetch_response_group_roundtrip(
     writer = entity_writer(OffsetFetchResponseGroup)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_response_group(buffer)
+        remaining, result = read_offset_fetch_response_group(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -75,8 +84,11 @@ def test_offset_fetch_response_roundtrip(instance: OffsetFetchResponse) -> None:
     writer = entity_writer(OffsetFetchResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_response(buffer)
+        remaining, result = read_offset_fetch_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

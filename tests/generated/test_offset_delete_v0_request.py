@@ -28,8 +28,11 @@ def test_offset_delete_request_partition_roundtrip(
     writer = entity_writer(OffsetDeleteRequestPartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_delete_request_partition(buffer)
+        remaining, result = read_offset_delete_request_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -44,8 +47,11 @@ def test_offset_delete_request_topic_roundtrip(
     writer = entity_writer(OffsetDeleteRequestTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_delete_request_topic(buffer)
+        remaining, result = read_offset_delete_request_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -58,8 +64,11 @@ def test_offset_delete_request_roundtrip(instance: OffsetDeleteRequest) -> None:
     writer = entity_writer(OffsetDeleteRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_delete_request(buffer)
+        remaining, result = read_offset_delete_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

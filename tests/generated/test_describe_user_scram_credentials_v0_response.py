@@ -28,8 +28,11 @@ def test_credential_info_roundtrip(instance: CredentialInfo) -> None:
     writer = entity_writer(CredentialInfo)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_credential_info(buffer)
+        remaining, result = read_credential_info(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -46,8 +49,11 @@ def test_describe_user_scram_credentials_result_roundtrip(
     writer = entity_writer(DescribeUserScramCredentialsResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_user_scram_credentials_result(buffer)
+        remaining, result = read_describe_user_scram_credentials_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -64,8 +70,11 @@ def test_describe_user_scram_credentials_response_roundtrip(
     writer = entity_writer(DescribeUserScramCredentialsResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_user_scram_credentials_response(buffer)
+        remaining, result = read_describe_user_scram_credentials_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

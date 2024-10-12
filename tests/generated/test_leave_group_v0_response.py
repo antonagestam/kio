@@ -22,8 +22,11 @@ def test_leave_group_response_roundtrip(instance: LeaveGroupResponse) -> None:
     writer = entity_writer(LeaveGroupResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_leave_group_response(buffer)
+        remaining, result = read_leave_group_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

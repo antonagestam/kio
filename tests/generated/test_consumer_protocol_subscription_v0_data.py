@@ -26,8 +26,11 @@ def test_consumer_protocol_subscription_roundtrip(
     writer = entity_writer(ConsumerProtocolSubscription)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_consumer_protocol_subscription(buffer)
+        remaining, result = read_consumer_protocol_subscription(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

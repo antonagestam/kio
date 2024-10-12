@@ -22,8 +22,11 @@ def test_init_producer_id_response_roundtrip(instance: InitProducerIdResponse) -
     writer = entity_writer(InitProducerIdResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_init_producer_id_response(buffer)
+        remaining, result = read_init_producer_id_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

@@ -30,8 +30,11 @@ def test_alter_replica_log_dir_partition_result_roundtrip(
     writer = entity_writer(AlterReplicaLogDirPartitionResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_replica_log_dir_partition_result(buffer)
+        remaining, result = read_alter_replica_log_dir_partition_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -48,8 +51,11 @@ def test_alter_replica_log_dir_topic_result_roundtrip(
     writer = entity_writer(AlterReplicaLogDirTopicResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_replica_log_dir_topic_result(buffer)
+        remaining, result = read_alter_replica_log_dir_topic_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -64,8 +70,11 @@ def test_alter_replica_log_dirs_response_roundtrip(
     writer = entity_writer(AlterReplicaLogDirsResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_replica_log_dirs_response(buffer)
+        remaining, result = read_alter_replica_log_dirs_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

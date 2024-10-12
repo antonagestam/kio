@@ -28,8 +28,11 @@ def test_get_telemetry_subscriptions_request_roundtrip(
     writer = entity_writer(GetTelemetrySubscriptionsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_get_telemetry_subscriptions_request(buffer)
+        remaining, result = read_get_telemetry_subscriptions_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

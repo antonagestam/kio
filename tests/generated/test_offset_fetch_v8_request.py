@@ -26,8 +26,11 @@ def test_offset_fetch_request_topics_roundtrip(
     writer = entity_writer(OffsetFetchRequestTopics)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_request_topics(buffer)
+        remaining, result = read_offset_fetch_request_topics(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -42,8 +45,11 @@ def test_offset_fetch_request_group_roundtrip(
     writer = entity_writer(OffsetFetchRequestGroup)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_request_group(buffer)
+        remaining, result = read_offset_fetch_request_group(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -56,8 +62,11 @@ def test_offset_fetch_request_roundtrip(instance: OffsetFetchRequest) -> None:
     writer = entity_writer(OffsetFetchRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_fetch_request(buffer)
+        remaining, result = read_offset_fetch_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

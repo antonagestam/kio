@@ -24,8 +24,11 @@ def test_list_offsets_partition_roundtrip(instance: ListOffsetsPartition) -> Non
     writer = entity_writer(ListOffsetsPartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_list_offsets_partition(buffer)
+        remaining, result = read_list_offsets_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -38,8 +41,11 @@ def test_list_offsets_topic_roundtrip(instance: ListOffsetsTopic) -> None:
     writer = entity_writer(ListOffsetsTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_list_offsets_topic(buffer)
+        remaining, result = read_list_offsets_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -52,8 +58,11 @@ def test_list_offsets_request_roundtrip(instance: ListOffsetsRequest) -> None:
     writer = entity_writer(ListOffsetsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_list_offsets_request(buffer)
+        remaining, result = read_list_offsets_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

@@ -30,8 +30,11 @@ def test_update_metadata_partition_state_roundtrip(
     writer = entity_writer(UpdateMetadataPartitionState)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_metadata_partition_state(buffer)
+        remaining, result = read_update_metadata_partition_state(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -46,8 +49,11 @@ def test_update_metadata_topic_state_roundtrip(
     writer = entity_writer(UpdateMetadataTopicState)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_metadata_topic_state(buffer)
+        remaining, result = read_update_metadata_topic_state(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -60,8 +66,11 @@ def test_update_metadata_endpoint_roundtrip(instance: UpdateMetadataEndpoint) ->
     writer = entity_writer(UpdateMetadataEndpoint)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_metadata_endpoint(buffer)
+        remaining, result = read_update_metadata_endpoint(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -74,8 +83,11 @@ def test_update_metadata_broker_roundtrip(instance: UpdateMetadataBroker) -> Non
     writer = entity_writer(UpdateMetadataBroker)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_metadata_broker(buffer)
+        remaining, result = read_update_metadata_broker(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -88,8 +100,11 @@ def test_update_metadata_request_roundtrip(instance: UpdateMetadataRequest) -> N
     writer = entity_writer(UpdateMetadataRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_metadata_request(buffer)
+        remaining, result = read_update_metadata_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

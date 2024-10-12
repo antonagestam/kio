@@ -22,8 +22,11 @@ def test_heartbeat_response_roundtrip(instance: HeartbeatResponse) -> None:
     writer = entity_writer(HeartbeatResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_heartbeat_response(buffer)
+        remaining, result = read_heartbeat_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

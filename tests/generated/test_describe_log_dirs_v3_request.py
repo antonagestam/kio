@@ -23,8 +23,11 @@ def test_describable_log_dir_topic_roundtrip(instance: DescribableLogDirTopic) -
     writer = entity_writer(DescribableLogDirTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describable_log_dir_topic(buffer)
+        remaining, result = read_describable_log_dir_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_describe_log_dirs_request_roundtrip(instance: DescribeLogDirsRequest) -
     writer = entity_writer(DescribeLogDirsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_log_dirs_request(buffer)
+        remaining, result = read_describe_log_dirs_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

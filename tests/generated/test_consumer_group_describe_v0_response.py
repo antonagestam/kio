@@ -26,8 +26,11 @@ def test_topic_partitions_roundtrip(instance: TopicPartitions) -> None:
     writer = entity_writer(TopicPartitions)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_topic_partitions(buffer)
+        remaining, result = read_topic_partitions(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -40,8 +43,11 @@ def test_assignment_roundtrip(instance: Assignment) -> None:
     writer = entity_writer(Assignment)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_assignment(buffer)
+        remaining, result = read_assignment(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -54,8 +60,11 @@ def test_member_roundtrip(instance: Member) -> None:
     writer = entity_writer(Member)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_member(buffer)
+        remaining, result = read_member(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -68,8 +77,11 @@ def test_described_group_roundtrip(instance: DescribedGroup) -> None:
     writer = entity_writer(DescribedGroup)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_described_group(buffer)
+        remaining, result = read_described_group(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -86,8 +98,11 @@ def test_consumer_group_describe_response_roundtrip(
     writer = entity_writer(ConsumerGroupDescribeResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_consumer_group_describe_response(buffer)
+        remaining, result = read_consumer_group_describe_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

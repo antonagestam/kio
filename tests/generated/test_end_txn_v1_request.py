@@ -22,8 +22,11 @@ def test_end_txn_request_roundtrip(instance: EndTxnRequest) -> None:
     writer = entity_writer(EndTxnRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_end_txn_request(buffer)
+        remaining, result = read_end_txn_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

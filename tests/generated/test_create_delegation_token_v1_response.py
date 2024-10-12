@@ -26,8 +26,11 @@ def test_create_delegation_token_response_roundtrip(
     writer = entity_writer(CreateDelegationTokenResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_create_delegation_token_response(buffer)
+        remaining, result = read_create_delegation_token_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

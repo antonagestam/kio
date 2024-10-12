@@ -24,8 +24,11 @@ def test_renew_delegation_token_request_roundtrip(
     writer = entity_writer(RenewDelegationTokenRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_renew_delegation_token_request(buffer)
+        remaining, result = read_renew_delegation_token_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

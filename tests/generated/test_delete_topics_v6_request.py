@@ -23,8 +23,11 @@ def test_delete_topic_state_roundtrip(instance: DeleteTopicState) -> None:
     writer = entity_writer(DeleteTopicState)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_topic_state(buffer)
+        remaining, result = read_delete_topic_state(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_delete_topics_request_roundtrip(instance: DeleteTopicsRequest) -> None:
     writer = entity_writer(DeleteTopicsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_topics_request(buffer)
+        remaining, result = read_delete_topics_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

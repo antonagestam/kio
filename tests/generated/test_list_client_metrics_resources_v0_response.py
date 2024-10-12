@@ -25,8 +25,11 @@ def test_client_metrics_resource_roundtrip(instance: ClientMetricsResource) -> N
     writer = entity_writer(ClientMetricsResource)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_client_metrics_resource(buffer)
+        remaining, result = read_client_metrics_resource(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -43,8 +46,11 @@ def test_list_client_metrics_resources_response_roundtrip(
     writer = entity_writer(ListClientMetricsResourcesResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_list_client_metrics_resources_response(buffer)
+        remaining, result = read_list_client_metrics_resources_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

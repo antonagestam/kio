@@ -23,8 +23,11 @@ def test_coordinator_roundtrip(instance: Coordinator) -> None:
     writer = entity_writer(Coordinator)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_coordinator(buffer)
+        remaining, result = read_coordinator(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_find_coordinator_response_roundtrip(instance: FindCoordinatorResponse) 
     writer = entity_writer(FindCoordinatorResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_find_coordinator_response(buffer)
+        remaining, result = read_find_coordinator_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

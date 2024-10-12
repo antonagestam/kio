@@ -25,8 +25,11 @@ def test_fetch_partition_roundtrip(instance: FetchPartition) -> None:
     writer = entity_writer(FetchPartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_fetch_partition(buffer)
+        remaining, result = read_fetch_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -39,8 +42,11 @@ def test_fetch_topic_roundtrip(instance: FetchTopic) -> None:
     writer = entity_writer(FetchTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_fetch_topic(buffer)
+        remaining, result = read_fetch_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -53,8 +59,11 @@ def test_forgotten_topic_roundtrip(instance: ForgottenTopic) -> None:
     writer = entity_writer(ForgottenTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_forgotten_topic(buffer)
+        remaining, result = read_forgotten_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -67,8 +76,11 @@ def test_fetch_request_roundtrip(instance: FetchRequest) -> None:
     writer = entity_writer(FetchRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_fetch_request(buffer)
+        remaining, result = read_fetch_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

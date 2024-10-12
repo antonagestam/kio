@@ -26,8 +26,11 @@ def test_expire_delegation_token_request_roundtrip(
     writer = entity_writer(ExpireDelegationTokenRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_expire_delegation_token_request(buffer)
+        remaining, result = read_expire_delegation_token_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

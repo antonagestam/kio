@@ -23,8 +23,11 @@ def test_api_version_roundtrip(instance: ApiVersion) -> None:
     writer = entity_writer(ApiVersion)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_api_version(buffer)
+        remaining, result = read_api_version(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_api_versions_response_roundtrip(instance: ApiVersionsResponse) -> None:
     writer = entity_writer(ApiVersionsResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_api_versions_response(buffer)
+        remaining, result = read_api_versions_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

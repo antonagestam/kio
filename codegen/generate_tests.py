@@ -41,8 +41,11 @@ def test_{entity_snake_case}_roundtrip(instance: {entity_type}) -> None:
     writer = entity_writer({entity_type})
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_{entity_snake_case}(buffer)
+        remaining, result = read_{entity_snake_case}(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 """
 

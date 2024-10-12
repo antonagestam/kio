@@ -23,8 +23,11 @@ def test_voter_roundtrip(instance: Voter) -> None:
     writer = entity_writer(Voter)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_voter(buffer)
+        remaining, result = read_voter(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_leader_change_message_roundtrip(instance: LeaderChangeMessage) -> None:
     writer = entity_writer(LeaderChangeMessage)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_leader_change_message(buffer)
+        remaining, result = read_leader_change_message(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

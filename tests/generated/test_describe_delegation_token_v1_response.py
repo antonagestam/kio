@@ -32,8 +32,11 @@ def test_described_delegation_token_renewer_roundtrip(
     writer = entity_writer(DescribedDelegationTokenRenewer)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_described_delegation_token_renewer(buffer)
+        remaining, result = read_described_delegation_token_renewer(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -48,8 +51,11 @@ def test_described_delegation_token_roundtrip(
     writer = entity_writer(DescribedDelegationToken)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_described_delegation_token(buffer)
+        remaining, result = read_described_delegation_token(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -66,8 +72,11 @@ def test_describe_delegation_token_response_roundtrip(
     writer = entity_writer(DescribeDelegationTokenResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_delegation_token_response(buffer)
+        remaining, result = read_describe_delegation_token_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

@@ -24,8 +24,11 @@ def test_delete_records_partition_roundtrip(instance: DeleteRecordsPartition) ->
     writer = entity_writer(DeleteRecordsPartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_records_partition(buffer)
+        remaining, result = read_delete_records_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -38,8 +41,11 @@ def test_delete_records_topic_roundtrip(instance: DeleteRecordsTopic) -> None:
     writer = entity_writer(DeleteRecordsTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_records_topic(buffer)
+        remaining, result = read_delete_records_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -52,8 +58,11 @@ def test_delete_records_request_roundtrip(instance: DeleteRecordsRequest) -> Non
     writer = entity_writer(DeleteRecordsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_records_request(buffer)
+        remaining, result = read_delete_records_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

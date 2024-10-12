@@ -27,8 +27,11 @@ def test_creatable_replica_assignment_roundtrip(
     writer = entity_writer(CreatableReplicaAssignment)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_creatable_replica_assignment(buffer)
+        remaining, result = read_creatable_replica_assignment(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -41,8 +44,11 @@ def test_createable_topic_config_roundtrip(instance: CreateableTopicConfig) -> N
     writer = entity_writer(CreateableTopicConfig)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_createable_topic_config(buffer)
+        remaining, result = read_createable_topic_config(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -55,8 +61,11 @@ def test_creatable_topic_roundtrip(instance: CreatableTopic) -> None:
     writer = entity_writer(CreatableTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_creatable_topic(buffer)
+        remaining, result = read_creatable_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -69,8 +78,11 @@ def test_create_topics_request_roundtrip(instance: CreateTopicsRequest) -> None:
     writer = entity_writer(CreateTopicsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_create_topics_request(buffer)
+        remaining, result = read_create_topics_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

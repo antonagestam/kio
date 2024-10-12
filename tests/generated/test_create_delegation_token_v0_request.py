@@ -23,8 +23,11 @@ def test_creatable_renewers_roundtrip(instance: CreatableRenewers) -> None:
     writer = entity_writer(CreatableRenewers)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_creatable_renewers(buffer)
+        remaining, result = read_creatable_renewers(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -41,8 +44,11 @@ def test_create_delegation_token_request_roundtrip(
     writer = entity_writer(CreateDelegationTokenRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_create_delegation_token_request(buffer)
+        remaining, result = read_create_delegation_token_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

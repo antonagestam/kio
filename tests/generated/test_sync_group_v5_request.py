@@ -25,8 +25,11 @@ def test_sync_group_request_assignment_roundtrip(
     writer = entity_writer(SyncGroupRequestAssignment)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_sync_group_request_assignment(buffer)
+        remaining, result = read_sync_group_request_assignment(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -39,8 +42,11 @@ def test_sync_group_request_roundtrip(instance: SyncGroupRequest) -> None:
     writer = entity_writer(SyncGroupRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_sync_group_request(buffer)
+        remaining, result = read_sync_group_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

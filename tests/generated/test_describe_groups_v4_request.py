@@ -22,8 +22,11 @@ def test_describe_groups_request_roundtrip(instance: DescribeGroupsRequest) -> N
     writer = entity_writer(DescribeGroupsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_groups_request(buffer)
+        remaining, result = read_describe_groups_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

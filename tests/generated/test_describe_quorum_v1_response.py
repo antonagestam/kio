@@ -25,8 +25,11 @@ def test_replica_state_roundtrip(instance: ReplicaState) -> None:
     writer = entity_writer(ReplicaState)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_replica_state(buffer)
+        remaining, result = read_replica_state(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -39,8 +42,11 @@ def test_partition_data_roundtrip(instance: PartitionData) -> None:
     writer = entity_writer(PartitionData)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_partition_data(buffer)
+        remaining, result = read_partition_data(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -53,8 +59,11 @@ def test_topic_data_roundtrip(instance: TopicData) -> None:
     writer = entity_writer(TopicData)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_topic_data(buffer)
+        remaining, result = read_topic_data(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -67,8 +76,11 @@ def test_describe_quorum_response_roundtrip(instance: DescribeQuorumResponse) ->
     writer = entity_writer(DescribeQuorumResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_quorum_response(buffer)
+        remaining, result = read_describe_quorum_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

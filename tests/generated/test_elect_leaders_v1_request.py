@@ -23,8 +23,11 @@ def test_topic_partitions_roundtrip(instance: TopicPartitions) -> None:
     writer = entity_writer(TopicPartitions)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_topic_partitions(buffer)
+        remaining, result = read_topic_partitions(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_elect_leaders_request_roundtrip(instance: ElectLeadersRequest) -> None:
     writer = entity_writer(ElectLeadersRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_elect_leaders_request(buffer)
+        remaining, result = read_elect_leaders_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

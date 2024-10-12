@@ -29,8 +29,11 @@ def test_writable_txn_marker_partition_result_roundtrip(
     writer = entity_writer(WritableTxnMarkerPartitionResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_writable_txn_marker_partition_result(buffer)
+        remaining, result = read_writable_txn_marker_partition_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -47,8 +50,11 @@ def test_writable_txn_marker_topic_result_roundtrip(
     writer = entity_writer(WritableTxnMarkerTopicResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_writable_txn_marker_topic_result(buffer)
+        remaining, result = read_writable_txn_marker_topic_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -63,8 +69,11 @@ def test_writable_txn_marker_result_roundtrip(
     writer = entity_writer(WritableTxnMarkerResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_writable_txn_marker_result(buffer)
+        remaining, result = read_writable_txn_marker_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -79,8 +88,11 @@ def test_write_txn_markers_response_roundtrip(
     writer = entity_writer(WriteTxnMarkersResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_write_txn_markers_response(buffer)
+        remaining, result = read_write_txn_markers_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

@@ -25,8 +25,11 @@ def test_metadata_response_broker_roundtrip(instance: MetadataResponseBroker) ->
     writer = entity_writer(MetadataResponseBroker)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_response_broker(buffer)
+        remaining, result = read_metadata_response_broker(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -41,8 +44,11 @@ def test_metadata_response_partition_roundtrip(
     writer = entity_writer(MetadataResponsePartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_response_partition(buffer)
+        remaining, result = read_metadata_response_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -55,8 +61,11 @@ def test_metadata_response_topic_roundtrip(instance: MetadataResponseTopic) -> N
     writer = entity_writer(MetadataResponseTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_response_topic(buffer)
+        remaining, result = read_metadata_response_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -69,8 +78,11 @@ def test_metadata_response_roundtrip(instance: MetadataResponse) -> None:
     writer = entity_writer(MetadataResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_response(buffer)
+        remaining, result = read_metadata_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

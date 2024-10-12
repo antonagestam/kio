@@ -26,8 +26,11 @@ def test_scram_credential_deletion_roundtrip(instance: ScramCredentialDeletion) 
     writer = entity_writer(ScramCredentialDeletion)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_scram_credential_deletion(buffer)
+        remaining, result = read_scram_credential_deletion(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -42,8 +45,11 @@ def test_scram_credential_upsertion_roundtrip(
     writer = entity_writer(ScramCredentialUpsertion)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_scram_credential_upsertion(buffer)
+        remaining, result = read_scram_credential_upsertion(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -60,8 +66,11 @@ def test_alter_user_scram_credentials_request_roundtrip(
     writer = entity_writer(AlterUserScramCredentialsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_user_scram_credentials_request(buffer)
+        remaining, result = read_alter_user_scram_credentials_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

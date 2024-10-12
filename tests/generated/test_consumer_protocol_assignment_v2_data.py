@@ -23,8 +23,11 @@ def test_topic_partition_roundtrip(instance: TopicPartition) -> None:
     writer = entity_writer(TopicPartition)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_topic_partition(buffer)
+        remaining, result = read_topic_partition(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -39,8 +42,11 @@ def test_consumer_protocol_assignment_roundtrip(
     writer = entity_writer(ConsumerProtocolAssignment)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_consumer_protocol_assignment(buffer)
+        remaining, result = read_consumer_protocol_assignment(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

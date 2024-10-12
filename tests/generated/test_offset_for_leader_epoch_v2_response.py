@@ -24,8 +24,11 @@ def test_epoch_end_offset_roundtrip(instance: EpochEndOffset) -> None:
     writer = entity_writer(EpochEndOffset)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_epoch_end_offset(buffer)
+        remaining, result = read_epoch_end_offset(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -40,8 +43,11 @@ def test_offset_for_leader_topic_result_roundtrip(
     writer = entity_writer(OffsetForLeaderTopicResult)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_for_leader_topic_result(buffer)
+        remaining, result = read_offset_for_leader_topic_result(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -58,8 +64,11 @@ def test_offset_for_leader_epoch_response_roundtrip(
     writer = entity_writer(OffsetForLeaderEpochResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_offset_for_leader_epoch_response(buffer)
+        remaining, result = read_offset_for_leader_epoch_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

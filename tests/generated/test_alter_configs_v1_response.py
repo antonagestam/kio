@@ -27,8 +27,11 @@ def test_alter_configs_resource_response_roundtrip(
     writer = entity_writer(AlterConfigsResourceResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_configs_resource_response(buffer)
+        remaining, result = read_alter_configs_resource_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -41,8 +44,11 @@ def test_alter_configs_response_roundtrip(instance: AlterConfigsResponse) -> Non
     writer = entity_writer(AlterConfigsResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_alter_configs_response(buffer)
+        remaining, result = read_alter_configs_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

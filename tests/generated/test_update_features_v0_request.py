@@ -23,8 +23,11 @@ def test_feature_update_key_roundtrip(instance: FeatureUpdateKey) -> None:
     writer = entity_writer(FeatureUpdateKey)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_feature_update_key(buffer)
+        remaining, result = read_feature_update_key(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_update_features_request_roundtrip(instance: UpdateFeaturesRequest) -> N
     writer = entity_writer(UpdateFeaturesRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_update_features_request(buffer)
+        remaining, result = read_update_features_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

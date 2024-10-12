@@ -22,8 +22,11 @@ def test_add_offsets_to_txn_request_roundtrip(instance: AddOffsetsToTxnRequest) 
     writer = entity_writer(AddOffsetsToTxnRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_add_offsets_to_txn_request(buffer)
+        remaining, result = read_add_offsets_to_txn_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

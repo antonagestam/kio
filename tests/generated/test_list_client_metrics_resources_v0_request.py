@@ -28,8 +28,11 @@ def test_list_client_metrics_resources_request_roundtrip(
     writer = entity_writer(ListClientMetricsResourcesRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_list_client_metrics_resources_request(buffer)
+        remaining, result = read_list_client_metrics_resources_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

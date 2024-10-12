@@ -22,8 +22,11 @@ def test_push_telemetry_response_roundtrip(instance: PushTelemetryResponse) -> N
     writer = entity_writer(PushTelemetryResponse)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_push_telemetry_response(buffer)
+        remaining, result = read_push_telemetry_response(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

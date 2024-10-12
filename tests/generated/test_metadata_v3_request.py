@@ -23,8 +23,11 @@ def test_metadata_request_topic_roundtrip(instance: MetadataRequestTopic) -> Non
     writer = entity_writer(MetadataRequestTopic)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_request_topic(buffer)
+        remaining, result = read_metadata_request_topic(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_metadata_request_roundtrip(instance: MetadataRequest) -> None:
     writer = entity_writer(MetadataRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_metadata_request(buffer)
+        remaining, result = read_metadata_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

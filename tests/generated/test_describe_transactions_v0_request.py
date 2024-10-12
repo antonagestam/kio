@@ -24,8 +24,11 @@ def test_describe_transactions_request_roundtrip(
     writer = entity_writer(DescribeTransactionsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_describe_transactions_request(buffer)
+        remaining, result = read_describe_transactions_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 

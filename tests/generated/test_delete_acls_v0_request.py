@@ -23,8 +23,11 @@ def test_delete_acls_filter_roundtrip(instance: DeleteAclsFilter) -> None:
     writer = entity_writer(DeleteAclsFilter)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_acls_filter(buffer)
+        remaining, result = read_delete_acls_filter(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
@@ -37,8 +40,11 @@ def test_delete_acls_request_roundtrip(instance: DeleteAclsRequest) -> None:
     writer = entity_writer(DeleteAclsRequest)
     with setup_buffer() as buffer:
         writer(buffer, instance)
-        buffer.seek(0)
-        result = read_delete_acls_request(buffer)
+        remaining, result = read_delete_acls_request(
+            buffer.getbuffer(),
+        )
+
+    assert remaining == b""
     assert instance == result
 
 
