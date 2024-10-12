@@ -19,7 +19,7 @@ from ._introspect import get_field_tag
 from ._introspect import get_schema_field_type
 from ._introspect import is_optional
 from ._shared import NullableEntityMarker
-from .readers import read_int8
+from .readers import read_int8, BufferAnd
 
 
 def get_reader(
@@ -173,34 +173,42 @@ def entity_reader(
     if tagged_field_readers and not entity_type.__flexible__:
         raise ValueError("Found tagged fields on a non-flexible model")
 
-    def read_entity(buffer: IO[bytes]) -> E:
+    def read_entity(buffer: memoryview) -> BufferAnd[E]:
+        remaining = buffer
+        del buffer
         # Read regular fields.
-        kwargs = {
-            field.name: field_reader(buffer)
-            for field, field_reader in field_readers.items()
-        }
+        kwargs = {}
+        for field, field_reader in field_readers.items():
+            remaining, kwargs[field.name] = field_reader(remaining)
 
         # For non-flexible entities we're done here.
         if not entity_type.__flexible__:
-            return entity_type(**kwargs)
+            return remaining, entity_type(**kwargs)
 
         # Read tagged fields.
-        num_tagged_fields = readers.read_unsigned_varint(buffer)
+        remaining, num_tagged_fields = readers.read_unsigned_varint(remaining)
         for _ in range(num_tagged_fields):
-            field_tag = readers.read_unsigned_varint(buffer)
-            readers.read_unsigned_varint(buffer)  # field length
+            remaining, field_tag = readers.read_unsigned_varint(remaining)
+            remaining, field_length = readers.read_unsigned_varint(remaining)
+            field_buffer = remaining[:field_length]
+            remaining = remaining[field_length:]
             field, field_reader = tagged_field_readers[field_tag]
-            kwargs[field.name] = field_reader(buffer)
+            kwargs[field.name] = field_reader(field_buffer)
 
-        return entity_type(**kwargs)
+        return remaining, entity_type(**kwargs)
 
     if not nullable:
         return read_entity
 
     # This is undocumented behavior, formalized in KIP-893.
     # https://cwiki.apache.org/confluence/display/KAFKA/KIP-893%3A+The+Kafka+protocol+should+support+nullable+structs
-    def read_nullable_entity(buffer: IO[bytes]) -> E | None:
-        marker = NullableEntityMarker(read_int8(buffer))
-        return None if marker is NullableEntityMarker.null else read_entity(buffer)
+    def read_nullable_entity(buffer: memoryview) -> BufferAnd[E | None]:
+        remaining, marker_int = read_int8(buffer)
+        marker = NullableEntityMarker(marker_int)
+        return (
+            (remaining, None)
+            if marker is NullableEntityMarker.null
+            else read_entity(buffer)
+        )
 
     return read_nullable_entity

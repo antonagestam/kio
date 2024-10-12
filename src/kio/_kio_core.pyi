@@ -1,10 +1,8 @@
 import datetime
 from uuid import UUID
 
-from phantom.datetime import TZAware
-
-from kio.static.constants import ErrorCode
-from kio.static.primitive import i8, i16, i32, i64, u8, u16, u32, u64, f64
+from kio.schema.errors import ErrorCode
+from kio.static.primitive import i8, i16, i32, i64, u8, u16, u32, u64, f64, TZAware
 from typing import TypeVar, TypeAlias
 
 T = TypeVar("T")

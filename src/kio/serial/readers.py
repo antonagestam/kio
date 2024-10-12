@@ -4,7 +4,7 @@ import datetime
 import struct
 
 from collections.abc import Callable
-from typing import Final
+from typing import Final, Generator
 from typing import TypeAlias
 from typing import TypeVar
 from uuid import UUID
@@ -132,99 +132,136 @@ def read_compact_string_as_bytes_nullable(
 ) -> BufferAnd[bytes | None]:
     remaining, length = read_unsigned_varint(buffer)
     if length == 0:
-        return None
+        return remaining, None
     # Apache Kafka® uses the string length plus 1.
     remaining, value_bytes = read_exact(remaining, length - 1)
     return remaining, bytes(value_bytes)
 
 
 def read_compact_string(buffer: memoryview) -> BufferAnd[str]:
-    return read_compact_string_as_bytes(buffer).decode()
+    remaining, bytes_value = read_compact_string_as_bytes(buffer)
+    return remaining, bytes_value.decode()
 
 
 def read_compact_string_nullable(buffer: memoryview) -> BufferAnd[str | None]:
-    bytes_value: bytes | None = read_compact_string_as_bytes_nullable(buffer)
+    remaining, bytes_value = read_compact_string_as_bytes_nullable(buffer)
     if bytes_value is None:
-        return None
-    return bytes_value.decode()
+        return remaining, None
+    return remaining, bytes_value.decode()
 
 
 def read_legacy_bytes(buffer: memoryview) -> BufferAnd[bytes]:
-    length = read_int32(buffer)
+    remaining, length = read_int32(buffer)
     if length == -1:
         raise UnexpectedNull("Unexpectedly read null where bytes was expected")
-    return bytes(read_exact(buffer, length))
+    remaining, bytes_view = read_exact(remaining, length)
+    return remaining, bytes(bytes_view)
 
 
 def read_nullable_legacy_bytes(buffer: memoryview) -> BufferAnd[bytes | None]:
-    length = read_int32(buffer)
+    remaining, length = read_int32(buffer)
     if length == -1:
-        return None
-    return bytes(read_exact(buffer, length))
+        return remaining, None
+    remaining, bytes_view = read_exact(remaining, length)
+    return remaining, bytes(bytes_view)
 
 
 def read_legacy_string(buffer: memoryview) -> BufferAnd[str]:
-    length = read_int16(buffer)
+    remaining, length = read_int16(buffer)
     if length == -1:
         raise UnexpectedNull("Unexpectedly read null where string/bytes was expected")
-    return bytes(read_exact(buffer, length)).decode()
+    remaining, bytes_view = read_exact(remaining, length)
+    return remaining, bytes(bytes_view).decode()
 
 
 def read_nullable_legacy_string(buffer: memoryview) -> BufferAnd[str | None]:
-    length = read_int16(buffer)
+    remaining, length = read_int16(buffer)
     if length == -1:
-        return None
-    return bytes(read_exact(buffer, length)).decode()
+        return remaining, None
+    remaining, bytes_view = read_exact(remaining, length)
+    return remaining, bytes(bytes_view).decode()
 
 
 read_legacy_array_length: Final = read_int32
 
 
 def read_compact_array_length(buffer: memoryview) -> BufferAnd[int]:
+    remaining, encoded_length = read_unsigned_varint(buffer)
     # Apache Kafka® uses the array size plus 1.
-    return read_unsigned_varint(buffer) - 1
+    return remaining, encoded_length - 1
 
 
 def read_uuid(buffer: memoryview) -> BufferAnd[UUID | None]:
-    byte_value: memoryview = read_exact(buffer, 16)
-    if byte_value == uuid_zero.bytes:
-        return None
-    return UUID(bytes=bytes(byte_value))
+    remaining, bytes_view = read_exact(buffer, 16)
+    if bytes_view == uuid_zero.bytes:
+        return remaining, None
+    return remaining, UUID(bytes=bytes(bytes_view))
+
+
+P = TypeVar("P")
+Q = TypeVar("Q")
+
+
+def _materialize_and_return(
+    generator: Generator[P, None, Q],
+) -> tuple[Q, tuple[P, ...]]:
+    values = tuple(value for value in generator)
+    try:
+        next(generator)
+    except StopIteration as stop:
+        return stop.value, values
+    else:
+        raise ValueError("Generator did not raise StopIteration")
+
+
+def _read_length_items(
+    item_reader: Reader[T],
+    length: int,
+    buffer: memoryview,
+) -> Generator[T, None, memoryview]:
+    remaining = buffer
+    for _ in range(length):
+        remaining, item_value = item_reader(remaining)
+        yield item_value
+    return remaining
 
 
 def compact_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
     def read_compact_array(buffer: memoryview) -> BufferAnd[tuple[T, ...] | None]:
-        length = read_compact_array_length(buffer)
+        remaining, length = read_compact_array_length(buffer)
         if length == -1:
-            return None
-        return tuple(item_reader(buffer) for _ in range(length))
+            return remaining, None
+        return _materialize_and_return(_read_length_items(item_reader, length, remaining))
 
     return read_compact_array
 
 
 def legacy_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
     def read_compact_array(buffer: memoryview) -> BufferAnd[tuple[T, ...] | None]:
-        length = read_legacy_array_length(buffer)
+        remaining, length = read_legacy_array_length(buffer)
         if length == -1:
-            return None
-        return tuple(item_reader(buffer) for _ in range(length))
+            return remaining, None
+        return _materialize_and_return(_read_length_items(item_reader, length, remaining))
 
     return read_compact_array
 
 
 def read_error_code(buffer: memoryview) -> BufferAnd[ErrorCode]:
-    return ErrorCode(read_int16(buffer))
+    remaining, error_code = read_int16(buffer)
+    return remaining, ErrorCode(error_code)
 
 
 def read_timedelta_i32(buffer: memoryview) -> BufferAnd[i32Timedelta]:
-    return datetime.timedelta(milliseconds=read_int32(buffer))  # type: ignore[return-value]
+    remaining, milliseconds = read_int32(buffer)
+    return remaining, datetime.timedelta(milliseconds=milliseconds)  # type: ignore[return-value]
 
 
 def read_timedelta_i64(buffer: memoryview) -> BufferAnd[i64Timedelta]:
-    return datetime.timedelta(milliseconds=read_int64(buffer))  # type: ignore[return-value]
+    remaining, milliseconds = read_int64(buffer)
+    return remaining, datetime.timedelta(milliseconds=milliseconds)  # type: ignore[return-value]
 
 
-def _tz_aware_from_i64(timestamp: i64) -> BufferAnd[TZAware]:
+def _tz_aware_from_i64(timestamp: i64) -> TZAware:
     dt = datetime.datetime.fromtimestamp(timestamp / 1000, datetime.UTC)
     try:
         return TZAware.truncate(dt)
@@ -233,14 +270,15 @@ def _tz_aware_from_i64(timestamp: i64) -> BufferAnd[TZAware]:
 
 
 def read_datetime_i64(buffer: memoryview) -> BufferAnd[TZAware]:
-    return _tz_aware_from_i64(read_int64(buffer))
+    remaining, timestamp = read_int64(buffer)
+    return remaining, _tz_aware_from_i64(timestamp)
 
 
 def read_nullable_datetime_i64(buffer: memoryview) -> BufferAnd[TZAware | None]:
-    timestamp = read_int64(buffer)
+    remaining, timestamp = read_int64(buffer)
     if timestamp == -1:
-        return None
-    return _tz_aware_from_i64(timestamp)
+        return remaining, None
+    return remaining, _tz_aware_from_i64(timestamp)
 
 
 # try:
