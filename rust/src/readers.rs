@@ -1,9 +1,11 @@
 use std::cmp::Ordering;
 use std::str;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyString};
+use pyo3::types::{PyBytes, PyString, PyMemoryView};
 use pyo3::{PyNativeType, Python};
 use pyo3::exceptions::PyValueError;
+use std::io::{self, Write};
+
 
 mod kio_errors {
     pyo3::import_exception!(kio.serial.errors, UnexpectedNull);
@@ -15,6 +17,18 @@ mod kio_errors {
 fn load_none(py: Python) -> PyResult<&PyAny> {
     let builtins = PyModule::import(py, "builtins")?;
     Ok(builtins.getattr("None")?)
+}
+
+#[pyfunction]
+pub fn foo(bytes: &PyMemoryView) -> PyResult<bool> {
+    print!("doot doot");
+    let _ = io::stdout().flush();
+    match &(bytes.as_bytes()) {
+        [0, ..] => Ok(false),
+        [1, ..] => Ok(true),
+        [] => Err(PyValueError::new_err("Buffer is exhausted")),
+        _ => Err(PyValueError::new_err("Invalid boolean value")),
+    }
 }
 
 #[pyfunction]

@@ -1,0 +1,148 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "oneOf": [
+        {
+            "properties": {
+                "apiKey": {"type": "number"},
+                "type": {
+                    "type": "string",
+                    "enum": ["request", "response"]
+                }
+            },
+            "required": ["apiKey"]
+        },
+        {
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["data", "header"]
+                }
+            }
+        }
+    ],
+    "properties": {
+        "apiKey": {"type": "number"},
+        "listeners": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "type": {
+            "type": "string",
+            "enum": ["request", "response", "data", "header"]
+        },
+        "name": {
+            "type": "string",
+            "minimum": 1
+        },
+        "validVersions": {"$ref": "#/$defs/versions"},
+        "flexibleVersions": {"$ref": "#/$defs/versions"},
+        "latestVersionUnstable": {"type": "boolean"},
+        "fields": {
+            "type": "array",
+            "items": {"$ref":  "#/$defs/field"}
+        },
+        "commonStructs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "name": {"type": "string"},
+                    "versions": {"$ref": "#/$defs/versions"},
+                    "fields": {
+                        "type": "array",
+                        "items": {"$ref": "#/$defs/field"}
+                    }
+                },
+                "required": ["name", "versions", "fields"]
+            }
+        }
+    },
+    "required": ["type", "name", "validVersions", "flexibleVersions", "fields"],
+    "$defs": {
+        "field": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "name": {"type": "string"},
+                "about": {"type": "string"},
+                "type": {
+                    "type": "string",
+                    "oneOf": [
+                        {
+                            "enum": [
+                                "int8",
+                                "int16",
+                                "int32",
+                                "int64",
+                                "uint16",
+                                "float64",
+                                "string",
+                                "bytes",
+                                "records",
+                                "bool",
+                                "uuid",
+                                "[]int8",
+                                "[]int16",
+                                "[]int32",
+                                "[]int64",
+                                "[]uint16",
+                                "[]float64",
+                                "[]string",
+                                "[]bytes",
+                                "[]records",
+                                "[]bool",
+                                "[]uuid"
+                            ]
+                        },
+                        {"pattern": "^(?:\\[\\])?[A-Z]"}
+                    ]
+                },
+                "entityType": {
+                    "type": "string",
+                    "enum": [
+                        "topicName",
+                        "brokerId",
+                        "producerId",
+                        "transactionalId",
+                        "groupId"
+                    ]
+                },
+                "default": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "number"},
+                        {"type": "boolean"}
+                    ]
+                },
+                "versions": {"$ref": "#/$defs/versions"},
+                "nullableVersions": {"$ref": "#/$defs/versions"},
+                "taggedVersions": {"$ref": "#/$defs/versions"},
+                "tag": {"type": "number"},
+                "flexibleVersions": {"$ref": "#/$defs/versions"},
+                "ignorable": {"type": "boolean"},
+                "fields": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/field"}
+                },
+                "mapKey": {"type": "boolean"},
+                "zeroCopy": {"type": "boolean"}
+            },
+            "required": ["name", "type", "versions"],
+            "dependentRequired": {
+                "tag": ["taggedVersions"],
+                "taggedVersions": ["tag"]
+            }
+        },
+        "versions": {
+            "type": "string",
+            "minimum": 1,
+            "oneOf": [
+                {"pattern": "^[0-9]+(?:\\+|-[0-9]+|)$"},
+                {"enum": ["none"]}
+            ]
+        }
+    }
+}

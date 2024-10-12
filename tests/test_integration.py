@@ -137,17 +137,17 @@ async def send(
 class CorrelationIdMismatch(RuntimeError): ...
 
 
-async def read_response_bytes(stream: StreamReader) -> io.BytesIO:
+async def read_response_bytes(stream: StreamReader) -> memoryview:
     response_length_bytes = await stream.readexactly(4)
     response_length = read_int32(io.BytesIO(response_length_bytes))
-    return io.BytesIO(await stream.readexactly(response_length))
+    return memoryview(await stream.readexactly(response_length))
 
 
 R = TypeVar("R", bound=ResponsePayload)
 
 
 def parse_response(
-    buffer: io.BytesIO,
+    buffer: memoryview,
     response_type: type[R],
     correlation_id: i32,
 ) -> R:
@@ -179,8 +179,8 @@ async def make_request(
             await send(stream_writer, request, correlation_id)
             response = await read_response_bytes(stream_reader)
 
-    # After this point, the connection is closed, and we're making synchronously reading
-    # the response from the in-memory buffer.
+    # After this point, the connection is closed, and we're synchronously reading the
+    # response from the in-memory buffer.
     with response as open_message_buffer:
         return parse_response(open_message_buffer, response_type, correlation_id)
 

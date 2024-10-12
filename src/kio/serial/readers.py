@@ -4,7 +4,6 @@ import datetime
 import struct
 
 from collections.abc import Callable
-from typing import IO
 from typing import Final
 from typing import TypeAlias
 from typing import TypeVar
@@ -29,151 +28,172 @@ from .errors import OutOfBoundValue
 from .errors import UnexpectedNull
 
 T = TypeVar("T")
-Reader: TypeAlias = Callable[[IO[bytes]], T]
+BufferAnd: TypeAlias = tuple[memoryview, T]
+Reader: TypeAlias = Callable[[memoryview], BufferAnd[T]]
 
 
-def read_exact(buffer: IO[bytes], num_bytes: int) -> bytes:
-    value = buffer.read(num_bytes)
-    if len(value) != num_bytes:
-        raise BufferUnderflow(f"Expected to read {num_bytes}, got {len(value)}")
-    return value
+def read_exact(
+    buffer: memoryview,
+    num_bytes: int,
+) -> BufferAnd[memoryview]:
+    value_bytes = buffer[:num_bytes]
+    if len(value_bytes) < num_bytes:
+        raise BufferUnderflow(
+            f"Expected to read {num_bytes} bytes, only {len(value_bytes)} left in "
+            f"buffer."
+        )
+    return buffer[num_bytes:], value_bytes
 
 
-def read_boolean(buffer: IO[bytes]) -> bool:
-    return struct.unpack(">?", read_exact(buffer, 1))[0]  # type: ignore[no-any-return]
+def read_boolean(buffer: memoryview) -> BufferAnd[bool]:
+    remaining, value_byte = read_exact(buffer, 1)
+    return remaining, struct.unpack(">?", value_byte)[0]
 
 
-def read_int8(buffer: IO[bytes]) -> i8:
-    return struct.unpack(">b", read_exact(buffer, 1))[0]  # type: ignore[no-any-return]
+def read_int8(buffer: memoryview) -> BufferAnd[i8]:
+    remaining, value_byte = read_exact(buffer, 1)
+    return remaining, struct.unpack(">b", value_byte)[0]
 
 
-def read_int16(buffer: IO[bytes]) -> i16:
-    return struct.unpack(">h", read_exact(buffer, 2))[0]  # type: ignore[no-any-return]
+def read_int16(buffer: memoryview) -> BufferAnd[i16]:
+    remaining, value_bytes = read_exact(buffer, 2)
+    return remaining, struct.unpack(">h", value_bytes)[0]
 
 
-def read_int32(buffer: IO[bytes]) -> i32:
-    return struct.unpack(">i", read_exact(buffer, 4))[0]  # type: ignore[no-any-return]
+def read_int32(buffer: memoryview) -> BufferAnd[i32]:
+    remaining, value_bytes = read_exact(buffer, 4)
+    return remaining, struct.unpack(">i", value_bytes)[0]
 
 
-def read_int64(buffer: IO[bytes]) -> i64:
-    return struct.unpack(">q", read_exact(buffer, 8))[0]  # type: ignore[no-any-return]
+def read_int64(buffer: memoryview) -> BufferAnd[i64]:
+    remaining, value_bytes = read_exact(buffer, 8)
+    return remaining, struct.unpack(">q", value_bytes)[0]
 
 
-def read_uint8(buffer: IO[bytes]) -> u8:
-    return struct.unpack(">B", read_exact(buffer, 1))[0]  # type: ignore[no-any-return]
+def read_uint8(buffer: memoryview) -> BufferAnd[u8]:
+    remaining, value_byte = read_exact(buffer, 1)
+    return remaining, struct.unpack(">B", value_byte)[0]
 
 
-def read_uint16(buffer: IO[bytes]) -> u16:
-    return struct.unpack(">H", read_exact(buffer, 2))[0]  # type: ignore[no-any-return]
+def read_uint16(buffer: memoryview) -> BufferAnd[u16]:
+    remaining, value_bytes = read_exact(buffer, 2)
+    return remaining, struct.unpack(">H", value_bytes)[0]
 
 
-def read_uint32(buffer: IO[bytes]) -> u32:
-    return struct.unpack(">I", read_exact(buffer, 4))[0]  # type: ignore[no-any-return]
+def read_uint32(buffer: memoryview) -> BufferAnd[u32]:
+    remaining, value_bytes = read_exact(buffer, 4)
+    return remaining, struct.unpack(">I", value_bytes)[0]
 
 
-def read_uint64(buffer: IO[bytes]) -> u64:
-    return struct.unpack(">Q", read_exact(buffer, 8))[0]  # type: ignore[no-any-return]
+def read_uint64(buffer: memoryview) -> BufferAnd[u64]:
+    remaining, value_bytes = read_exact(buffer, 8)
+    return remaining, struct.unpack(">Q", value_bytes)[0]
 
 
 # See description and upstream implementation.
 # https://developers.google.com/protocol-buffers/docs/encoding?csw=1#varints
 # https://github.com/apache/kafka/blob/ef96ac07f565a73e35c5b0f4c56c8e87cfbaaf59/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L262
-def read_unsigned_varint(buffer: IO[bytes]) -> int:
+def read_unsigned_varint(buffer: memoryview) -> BufferAnd[int]:
     """Deserialize an integer stored into variable number of bytes (1-5)."""
     result = 0
     # Increase shift by 7 on each iteration, looping at most 5 times.
     for shift in range(0, 4 * 7 + 1, 7):
         # Read value by a byte at a time.
-        (byte,) = read_exact(buffer, 1)
+        remaining, [byte] = read_exact(buffer, 1)
         # Add 7 least significant bits to the result.
         seven_bit_chunk = byte & 0b01111111
         result |= seven_bit_chunk << shift
         # If the most significant bit is 1, continue. Otherwise, stop.
         if byte & 0b10000000 == 0:
-            return result
+            return remaining, result
     raise ValueError(
         "Varint is too long, the most significant bit in the 5th byte is set"
     )
 
 
-def read_float64(buffer: IO[bytes]) -> float:
-    return struct.unpack(">d", read_exact(buffer, 8))[0]  # type: ignore[no-any-return]
+def read_float64(buffer: memoryview) -> BufferAnd[float]:
+    remaining, value_bytes = read_exact(buffer, 8)
+    return remaining, struct.unpack(">d", value_bytes)[0]
 
 
-def read_compact_string_as_bytes(buffer: IO[bytes]) -> bytes:
-    # Apache Kafka® uses the string length plus 1.
-    length = read_unsigned_varint(buffer) - 1
-    if length == -1:
+def read_compact_string_as_bytes(buffer: memoryview) -> BufferAnd[bytes]:
+    remaining, length = read_unsigned_varint(buffer)
+    if length == 0:
         raise UnexpectedNull(
             "Unexpectedly read null where compact string/bytes was expected"
         )
-    return read_exact(buffer, length)
-
-
-def read_compact_string_as_bytes_nullable(buffer: IO[bytes]) -> bytes | None:
     # Apache Kafka® uses the string length plus 1.
-    length = read_unsigned_varint(buffer) - 1
-    if length == -1:
+    remaining, value_bytes = read_exact(remaining, length - 1)
+    return remaining, bytes(value_bytes)
+
+
+def read_compact_string_as_bytes_nullable(
+    buffer: memoryview,
+) -> BufferAnd[bytes | None]:
+    remaining, length = read_unsigned_varint(buffer)
+    if length == 0:
         return None
-    return read_exact(buffer, length)
+    # Apache Kafka® uses the string length plus 1.
+    remaining, value_bytes = read_exact(remaining, length - 1)
+    return remaining, bytes(value_bytes)
 
 
-def read_compact_string(buffer: IO[bytes]) -> str:
+def read_compact_string(buffer: memoryview) -> BufferAnd[str]:
     return read_compact_string_as_bytes(buffer).decode()
 
 
-def read_compact_string_nullable(buffer: IO[bytes]) -> str | None:
+def read_compact_string_nullable(buffer: memoryview) -> BufferAnd[str | None]:
     bytes_value: bytes | None = read_compact_string_as_bytes_nullable(buffer)
     if bytes_value is None:
         return None
     return bytes_value.decode()
 
 
-def read_legacy_bytes(buffer: IO[bytes]) -> bytes:
+def read_legacy_bytes(buffer: memoryview) -> BufferAnd[bytes]:
     length = read_int32(buffer)
     if length == -1:
         raise UnexpectedNull("Unexpectedly read null where bytes was expected")
-    return read_exact(buffer, length)
+    return bytes(read_exact(buffer, length))
 
 
-def read_nullable_legacy_bytes(buffer: IO[bytes]) -> bytes | None:
+def read_nullable_legacy_bytes(buffer: memoryview) -> BufferAnd[bytes | None]:
     length = read_int32(buffer)
     if length == -1:
         return None
-    return read_exact(buffer, length)
+    return bytes(read_exact(buffer, length))
 
 
-def read_legacy_string(buffer: IO[bytes]) -> str:
+def read_legacy_string(buffer: memoryview) -> BufferAnd[str]:
     length = read_int16(buffer)
     if length == -1:
         raise UnexpectedNull("Unexpectedly read null where string/bytes was expected")
-    return read_exact(buffer, length).decode()
+    return bytes(read_exact(buffer, length)).decode()
 
 
-def read_nullable_legacy_string(buffer: IO[bytes]) -> str | None:
+def read_nullable_legacy_string(buffer: memoryview) -> BufferAnd[str | None]:
     length = read_int16(buffer)
     if length == -1:
         return None
-    return read_exact(buffer, length).decode()
+    return bytes(read_exact(buffer, length)).decode()
 
 
 read_legacy_array_length: Final = read_int32
 
 
-def read_compact_array_length(buffer: IO[bytes]) -> int:
+def read_compact_array_length(buffer: memoryview) -> BufferAnd[int]:
     # Apache Kafka® uses the array size plus 1.
     return read_unsigned_varint(buffer) - 1
 
 
-def read_uuid(buffer: IO[bytes]) -> UUID | None:
-    byte_value: bytes = read_exact(buffer, 16)
+def read_uuid(buffer: memoryview) -> BufferAnd[UUID | None]:
+    byte_value: memoryview = read_exact(buffer, 16)
     if byte_value == uuid_zero.bytes:
         return None
-    return UUID(bytes=byte_value)
+    return UUID(bytes=bytes(byte_value))
 
 
 def compact_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
-    def read_compact_array(buffer: IO[bytes]) -> tuple[T, ...] | None:
+    def read_compact_array(buffer: memoryview) -> BufferAnd[tuple[T, ...] | None]:
         length = read_compact_array_length(buffer)
         if length == -1:
             return None
@@ -183,7 +203,7 @@ def compact_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]
 
 
 def legacy_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
-    def read_compact_array(buffer: IO[bytes]) -> tuple[T, ...] | None:
+    def read_compact_array(buffer: memoryview) -> BufferAnd[tuple[T, ...] | None]:
         length = read_legacy_array_length(buffer)
         if length == -1:
             return None
@@ -192,19 +212,19 @@ def legacy_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]:
     return read_compact_array
 
 
-def read_error_code(buffer: IO[bytes]) -> ErrorCode:
+def read_error_code(buffer: memoryview) -> BufferAnd[ErrorCode]:
     return ErrorCode(read_int16(buffer))
 
 
-def read_timedelta_i32(buffer: IO[bytes]) -> i32Timedelta:
+def read_timedelta_i32(buffer: memoryview) -> BufferAnd[i32Timedelta]:
     return datetime.timedelta(milliseconds=read_int32(buffer))  # type: ignore[return-value]
 
 
-def read_timedelta_i64(buffer: IO[bytes]) -> i64Timedelta:
+def read_timedelta_i64(buffer: memoryview) -> BufferAnd[i64Timedelta]:
     return datetime.timedelta(milliseconds=read_int64(buffer))  # type: ignore[return-value]
 
 
-def _tz_aware_from_i64(timestamp: i64) -> TZAware:
+def _tz_aware_from_i64(timestamp: i64) -> BufferAnd[TZAware]:
     dt = datetime.datetime.fromtimestamp(timestamp / 1000, datetime.UTC)
     try:
         return TZAware.truncate(dt)
@@ -212,12 +232,21 @@ def _tz_aware_from_i64(timestamp: i64) -> TZAware:
         raise OutOfBoundValue("Read invalid value for datetime") from exception
 
 
-def read_datetime_i64(buffer: IO[bytes]) -> TZAware:
+def read_datetime_i64(buffer: memoryview) -> BufferAnd[TZAware]:
     return _tz_aware_from_i64(read_int64(buffer))
 
 
-def read_nullable_datetime_i64(buffer: IO[bytes]) -> TZAware | None:
+def read_nullable_datetime_i64(buffer: memoryview) -> BufferAnd[TZAware | None]:
     timestamp = read_int64(buffer)
     if timestamp == -1:
         return None
     return _tz_aware_from_i64(timestamp)
+
+
+# try:
+#     import _kio_core
+# except ImportError:
+#     print("No compiled _kio_core found")
+# else:
+#     for name in _kio_core.__all__:
+#         globals()[name] = _kio_core.__dict__[name]
