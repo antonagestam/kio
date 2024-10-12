@@ -35,6 +35,7 @@ from kio.static.primitive import i8
 from kio.static.primitive import i16
 from kio.static.primitive import i32
 from kio.static.primitive import i32Timedelta
+from tests.read_exhausted import exhausted
 
 
 class TestGetWriter:
@@ -178,11 +179,15 @@ class TestGetFieldWriter:
         # We test that the returned object is an int8 array writer, by making
         # sure it behaves like one.
         writer(buffer, [1, 2, 3])
-        buffer.seek(0)
-        assert read_compact_array_length(buffer) == 3
-        assert read_int8(buffer) == 1
-        assert read_int8(buffer) == 2
-        assert read_int8(buffer) == 3
+
+        remaining, length = read_compact_array_length(buffer.getbuffer())
+        assert length == 3
+        remaining, value = read_int8(remaining)
+        assert value == 1
+        remaining, value = read_int8(remaining)
+        assert value == 2
+        remaining, value = read_int8(remaining)
+        assert value == 3
 
     def test_returns_entity_writer_for_entity_field(
         self,
@@ -203,9 +208,11 @@ class TestGetFieldWriter:
         )
 
         writer(buffer, A(f=i8(23)))
-        buffer.seek(0)
-        assert read_int8(buffer) == 23
-        assert read_unsigned_varint(buffer) == 0  # tags
+
+        remaining, value = read_int8(buffer.getbuffer())
+        assert value == 23
+        # tags
+        assert exhausted(read_unsigned_varint(remaining)) == 0
 
     def test_returns_entity_writer_for_nullable_entity_field(
         self,
@@ -227,11 +234,15 @@ class TestGetFieldWriter:
 
         writer(buffer, A(f=i8(23)))
         writer(buffer, None)
-        buffer.seek(0)
-        assert NullableEntityMarker(read_int8(buffer)) is NullableEntityMarker.not_null
-        assert read_int8(buffer) == 23
-        assert read_unsigned_varint(buffer) == 0  # tags
-        assert NullableEntityMarker(read_int8(buffer)) is NullableEntityMarker.null
+
+        remaining, marker_value = read_int8(buffer.getbuffer())
+        assert NullableEntityMarker(marker_value) is NullableEntityMarker.not_null
+        remaining, value = read_int8(remaining)
+        assert value == 23
+        remaining, tags = read_unsigned_varint(remaining)
+        assert tags == 0
+        marker_value = exhausted(read_int8(remaining))
+        assert NullableEntityMarker(marker_value) is NullableEntityMarker.null
 
     def test_returns_entity_tuple_writer_for_entity_tuple_field(
         self,
@@ -252,12 +263,17 @@ class TestGetFieldWriter:
         )
 
         writer(buffer, [A(f=i8(23)), A(f=i8(17))])
-        buffer.seek(0)
-        assert read_compact_array_length(buffer) == 2
-        assert read_int8(buffer) == 23
-        assert read_unsigned_varint(buffer) == 0  # tags
-        assert read_int8(buffer) == 17
-        assert read_unsigned_varint(buffer) == 0  # tags
+
+        remaining, value = read_compact_array_length(buffer.getbuffer())
+        assert value == 2
+        remaining, value = read_int8(remaining)
+        assert value == 23
+        remaining, tags = read_unsigned_varint(remaining)
+        assert tags == 0
+        remaining, value = read_int8(remaining)
+        assert value == 17
+        tags = exhausted(read_unsigned_varint(remaining))
+        assert tags == 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

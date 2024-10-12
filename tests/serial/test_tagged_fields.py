@@ -23,7 +23,7 @@ from kio.serial.writers import write_unsigned_varint
 from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import u8
-from tests.read_exhausted import read_exhausted
+from tests.read_exhausted import exhausted
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -85,7 +85,7 @@ def test_can_parse_tagged_fields(
             tagged_value.value,
         )
 
-    assert read_exhausted(read_person(buffer.getbuffer())) == expected
+    assert exhausted(read_person(buffer.getbuffer())) == expected
 
 
 def test_raises_type_error_when_missing_required_tagged_field(
