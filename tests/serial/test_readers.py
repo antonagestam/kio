@@ -58,7 +58,7 @@ class BufferUnderflowContract:
 
     @classmethod
     def read(cls, buffer: BytesIO) -> object:
-        return cls.reader(buffer.getbuffer())
+        return exhausted(cls.reader(buffer.getbuffer()))
 
     @final
     def test_raises_buffer_underflow_when_not_enough_bytes_for_value(

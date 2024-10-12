@@ -97,10 +97,11 @@ def read_uint64(buffer: memoryview) -> BufferAnd[u64]:
 def read_unsigned_varint(buffer: memoryview) -> BufferAnd[int]:
     """Deserialize an integer stored into variable number of bytes (1-5)."""
     result = 0
+    remaining = buffer
     # Increase shift by 7 on each iteration, looping at most 5 times.
     for shift in range(0, 4 * 7 + 1, 7):
         # Read value by a byte at a time.
-        remaining, [byte] = read_exact(buffer, 1)
+        remaining, [byte] = read_exact(remaining, 1)
         # Add 7 least significant bits to the result.
         seven_bit_chunk = byte & 0b01111111
         result |= seven_bit_chunk << shift
@@ -206,11 +207,12 @@ Q = TypeVar("Q")
 def _materialize_and_return(
     generator: Generator[P, None, Q],
 ) -> tuple[Q, tuple[P, ...]]:
-    values = tuple(value for value in generator)
+    values = []
     try:
-        next(generator)
+        while True:
+            values.append(next(generator))
     except StopIteration as stop:
-        return stop.value, values
+        return stop.value, tuple(values)
     else:
         raise ValueError("Generator did not raise StopIteration")
 
