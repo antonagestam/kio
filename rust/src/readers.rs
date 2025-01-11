@@ -1,7 +1,9 @@
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use pyo3::Python;
+use std::cmp::Ordering;
 
 mod kio_errors {
     pyo3::import_exception!(kio.serial.errors, UnexpectedNull);
@@ -294,7 +296,7 @@ pub fn read_compact_string_as_bytes_nullable(
     )
 }
 
-fn decode_compact_string(bytes: &[u8], offset: usize, length: usize) -> OffsetResult<&str> {
+fn internal_slice_as_string(bytes: &[u8], offset: usize, length: usize) -> OffsetResult<&str> {
     // String length is encoded with an offset of 1, to allow encoding null as 0.
     let byte_end = offset + length - 1;
     if bytes.len() < byte_end {
@@ -302,10 +304,10 @@ fn decode_compact_string(bytes: &[u8], offset: usize, length: usize) -> OffsetRe
     }
     let sliced = &bytes[offset..byte_end];
     match std::str::from_utf8(sliced) {
+        Ok(string) => Ok((string, byte_end)),
         Err(_) => Err(kio_errors::InvalidUnicode::new_err(
             "Failed interpreting bytes as UTF-8",
         )),
-        Ok(string) => Ok((string, byte_end)),
     }
 }
 
@@ -314,7 +316,7 @@ fn internal_read_compact_string(bytes: &[u8]) -> OffsetResult<&str> {
         Ok((0, _)) => Err(kio_errors::UnexpectedNull::new_err(
             "Unexpectedly read null where compact string/bytes was expected",
         )),
-        Ok((length, byte_offset)) => decode_compact_string(bytes, byte_offset, length),
+        Ok((length, byte_offset)) => internal_slice_as_string(bytes, byte_offset, length),
         Err(error) => Err(error),
     }
 }
@@ -331,9 +333,9 @@ fn internal_read_compact_string_nullable(bytes: &[u8]) -> OffsetResult<Option<&s
     match internal_read_unsigned_varint(bytes) {
         Ok((0, offset)) => Ok((None, offset)),
         Ok((length, byte_offset)) => {
-            let (decoded, end_offset) = decode_compact_string(bytes, byte_offset, length)?;
+            let (decoded, end_offset) = internal_slice_as_string(bytes, byte_offset, length)?;
             Ok((Some(decoded), end_offset))
-        },
+        }
         Err(error) => Err(error),
     }
 }
@@ -348,4 +350,254 @@ pub fn read_compact_string_nullable(
         internal_read_compact_string_nullable(data_from_input(py, buffered, offset)?),
         offset,
     )
+}
+
+fn internal_read_int16_as_usize(bytes: &[u8]) -> OffsetResult<Option<usize>> {
+    const NULL_VALUE: i16 = -1;
+    match internal_read_int16(bytes) {
+        Ok((NULL_VALUE, offset)) => Ok((None, offset)),
+        Ok((length, offset)) => match usize::try_from(length) {
+            Ok(length) => Ok((Some(length), offset)),
+            Err(_) => Err(kio_errors::NegativeByteLength::new_err(
+                "Found negative byte length",
+            )),
+        },
+        Err(error) => Err(error),
+    }
+}
+
+fn slice_legacy_bytes(bytes: &[u8], offset: usize, length: usize) -> OffsetResult<&[u8]> {
+    let byte_end = offset + length;
+    if bytes.len() < byte_end {
+        return error_buffer_exhausted();
+    }
+    Ok((&bytes[offset..byte_end], byte_end))
+}
+
+fn internal_read_legacy_bytes(bytes: &[u8]) -> OffsetResult<&[u8]> {
+    match internal_read_int16_as_usize(bytes) {
+        Ok((Some(length), offset)) => slice_legacy_bytes(bytes, offset, length),
+        Ok((None, _)) => Err(kio_errors::UnexpectedNull::new_err(
+            "Unexpectedly read null where compact string/bytes was expected",
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_legacy_bytes(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<&[u8]> {
+    add_offset(
+        internal_read_legacy_bytes(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_nullable_legacy_bytes(bytes: &[u8]) -> OffsetResult<Option<&[u8]>> {
+    match internal_read_int16_as_usize(bytes) {
+        Ok((None, offset)) => Ok((None, offset)),
+        Ok((Some(length), offset)) => {
+            let (sliced_bytes, offset) = slice_legacy_bytes(bytes, offset, length)?;
+            return Ok((Some(sliced_bytes), offset));
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_nullable_legacy_bytes(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<&[u8]>> {
+    add_offset(
+        internal_read_nullable_legacy_bytes(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_legacy_string(bytes: &[u8]) -> OffsetResult<&str> {
+    match internal_read_int16_as_usize(bytes) {
+        Ok((Some(length), offset)) => internal_slice_as_string(bytes, offset, length + 1),
+        Ok((None, _)) => Err(kio_errors::UnexpectedNull::new_err(
+            "Unexpectedly read null where compact string/bytes was expected",
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_legacy_string(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<&str> {
+    add_offset(
+        internal_read_legacy_string(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_nullable_read_legacy_string(bytes: &[u8]) -> OffsetResult<Option<&str>> {
+    match internal_read_int16_as_usize(bytes) {
+        Ok((Some(length), offset)) => {
+            let (string, offset) = internal_slice_as_string(bytes, offset, length + 1)?;
+            return Ok((Some(string), offset));
+        }
+        Ok((None, offset)) => Ok((None, offset)),
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_nullable_legacy_string(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<&str>> {
+    add_offset(
+        internal_nullable_read_legacy_string(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+#[pyfunction]
+pub fn read_legacy_array_length(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<i32> {
+    add_offset(
+        internal_read_int32(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_compact_array_length(bytes: &[u8]) -> OffsetResult<usize> {
+    match internal_read_unsigned_varint(bytes) {
+        Ok((0, _)) => Err(kio_errors::NegativeByteLength::new_err(
+            "Found negative array length",
+        )),
+        // Kafka uses the array size plus 1.
+        Ok((value, offset)) => Ok((value - 1, offset)),
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_compact_array_length(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<usize> {
+    add_offset(
+        internal_read_compact_array_length(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+const UUID_BYTE_SIZE: usize = 16;
+
+fn internal_read_uuid(bytes: &[u8]) -> PyResult<Option<&[u8]>> {
+    const NULL_VALUE: u32 = 0;
+    if bytes.len() < UUID_BYTE_SIZE {
+        return error_buffer_exhausted();
+    }
+    let sliced = &bytes[..UUID_BYTE_SIZE];
+    let byte_sum: u32 = sliced.iter().map(|&b| b as u32).sum();
+    match byte_sum.cmp(&NULL_VALUE) {
+        Ordering::Equal | Ordering::Less => Ok(None),
+        Ordering::Greater => Ok(Some(sliced)),
+    }
+}
+
+fn instantiate_uuid<'a>(py: Python<'a>, bytes: Option<&[u8]>) -> OffsetResult<Option<Py<PyAny>>> {
+    match bytes {
+        Some(bytes) => {
+            let none = PyModule::import(py, "builtins")?.getattr("None")?;
+            let uuid_cls: Py<PyAny> = PyModule::import(py, "uuid")?.getattr("UUID")?.into();
+            let py_bytes = PyBytes::new(py, bytes);
+            // bytes is second key-word argument. We pass hex=None to avoid having to construct
+            // key-word arguments.
+            let args = (none, py_bytes);
+            let uuid_value = uuid_cls.call1(py, args)?.into();
+            Ok((uuid_value, UUID_BYTE_SIZE))
+        }
+        None => Ok((None, UUID_BYTE_SIZE)),
+    }
+}
+
+#[pyfunction]
+pub fn read_uuid(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<Py<PyAny>>> {
+    add_offset(
+        instantiate_uuid(
+            py,
+            internal_read_uuid(data_from_input(py, buffered, offset)?)?,
+        ),
+        offset,
+    )
+}
+
+fn internal_read_error_code(bytes: &[u8]) -> OffsetResult<i16> {
+    internal_read_int16(bytes)
+}
+
+#[pyfunction]
+pub fn read_error_code(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<Py<PyAny>> {
+    let (int_value, end_offset) = internal_read_error_code(data_from_input(py, buffered, offset)?)?;
+    let error_code_cls: Py<PyAny> = PyModule::import(py, "kio.schema.errors")?
+        .getattr("ErrorCode")?
+        .into();
+    let args = (int_value,);
+    let error_code = error_code_cls.call1(py, args)?.into();
+
+    add_offset(Ok((error_code, end_offset)), offset)
+}
+
+fn instantiate_timedelta<'a, T: IntoPyObject<'a>>(
+    py: Python<'a>,
+    int_value: T,
+) -> PyResult<Py<PyAny>> {
+    let timedelta_cls: Py<PyAny> = PyModule::import(py, "datetime")?
+        .getattr("timedelta")?
+        .into();
+    let args = (
+        0,         // days
+        0,         // seconds
+        0,         // microseconds
+        int_value, // milliseconds
+    );
+    let timedelta = timedelta_cls.call1(py, args)?.into();
+    Ok(timedelta)
+}
+
+fn internal_read_timedelta_i32(bytes: &[u8]) -> OffsetResult<i32> {
+    internal_read_int32(bytes)
+}
+
+#[pyfunction]
+pub fn read_timedelta_i32(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Py<PyAny>> {
+    let (int_value, end_offset) =
+        internal_read_timedelta_i32(data_from_input(py, buffered, offset)?)?;
+    let timedelta = instantiate_timedelta(py, int_value)?;
+    add_offset(Ok((timedelta, end_offset)), offset)
+}
+
+fn internal_read_timedelta_i64(bytes: &[u8]) -> OffsetResult<i64> {
+    internal_read_int64(bytes)
+}
+
+#[pyfunction]
+pub fn read_timedelta_i64(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Py<PyAny>> {
+    let (int_value, end_offset) =
+        internal_read_timedelta_i64(data_from_input(py, buffered, offset)?)?;
+    let timedelta = instantiate_timedelta(py, int_value)?;
+    add_offset(Ok((timedelta, end_offset)), offset)
 }

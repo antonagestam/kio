@@ -354,5 +354,40 @@ assert val == ("hello", 8), val
 assert read_compact_string_nullable(b"\x00", 0) == (None, 1)
 assert read_compact_string_nullable(b"cruft|\x00|cruft", 6) == (None, 7)
 
+val = read_uuid( b"\x00" * 16, 0)
+assert val == (None, 16), val
+val = read_uuid( b"\x00" * 15 + b"\x01", 0)
+assert val == (UUID(int=1), 16), val
+
+try: read_uuid( b"\x00", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
+val = read_error_code(b"\x00" * 2, 0)
+assert val == (ErrorCode.none, 2)
+val = read_error_code(b"\x00\x0e", 0)
+assert val == (ErrorCode.coordinator_load_in_progress, 2)
+
+try: read_error_code(b"", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
+try: read_error_code(b"\x00\x78", 0)
+except ValueError as exc: assert str(exc) == "120 is not a valid ErrorCode"
+else: assert False
+
+
+val = read_timedelta_i32(b"\x00" * 4, 0)
+assert val == (datetime.timedelta(), 4), val
+try: read_timedelta_i32(b"", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
+val = read_timedelta_i64(b"\x00" * 8, 0)
+assert val == (datetime.timedelta(), 8), val
+try: read_timedelta_i64(b"", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
 print("ok")
 raise SystemExit
