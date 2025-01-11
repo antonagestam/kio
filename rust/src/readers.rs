@@ -1,11 +1,7 @@
-use std::cmp::Ordering;
-use std::str;
-use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyString, PyMemoryView};
-use pyo3::{PyNativeType, Python};
+use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyValueError;
-use std::io::{self, Write};
-
+use pyo3::prelude::*;
+use pyo3::Python;
 
 mod kio_errors {
     pyo3::import_exception!(kio.serial.errors, UnexpectedNull);
@@ -14,139 +10,195 @@ mod kio_errors {
     pyo3::import_exception!(kio.serial.errors, OutOfBoundValue);
 }
 
-fn load_none(py: Python) -> PyResult<&PyAny> {
-    let builtins = PyModule::import(py, "builtins")?;
-    Ok(builtins.getattr("None")?)
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>());
 }
 
-#[pyfunction]
-pub fn foo(bytes: &PyMemoryView) -> PyResult<bool> {
-    print!("doot doot");
-    let _ = io::stdout().flush();
-    match &(bytes.as_bytes()) {
-        [0, ..] => Ok(false),
-        [1, ..] => Ok(true),
-        [] => Err(PyValueError::new_err("Buffer is exhausted")),
-        _ => Err(PyValueError::new_err("Invalid boolean value")),
-    }
-}
-
-#[pyfunction]
-pub fn read_boolean(bytes: &PyBytes, offset: usize) -> PyResult<(bool, usize)> {
-    match &(bytes.as_bytes())[offset..] {
-        [0, ..] => Ok((false, offset + 1)),
-        [1, ..] => Ok((true, offset + 1)),
-        [] => Err(PyValueError::new_err("Buffer is exhausted")),
-        _ => Err(PyValueError::new_err("Invalid boolean value")),
-    }
-}
-
-#[pyfunction]
-pub fn read_int8(bytes: &PyBytes, offset: usize) -> PyResult<(i8, usize)> {
-    let end_offset = offset + 1;
-
-    if let [a, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((i8::from_be_bytes([*a]), end_offset))
-    }
-
+fn error_buffer_exhausted<T>() -> PyResult<T> {
     Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
-#[pyfunction]
-pub fn read_int16(bytes: &PyBytes, offset: usize) -> PyResult<(i16, usize)> {
-    let end_offset = offset + 2;
-
-    if let [fst, snd, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((i16::from_be_bytes([*fst, *snd]), end_offset))
+fn data_from_input(py: Python, buffered: Py<PyAny>, offset: usize) -> PyResult<&[u8]> {
+    // https://github.com/PyO3/pyo3/issues/2824
+    let buffer = PyBuffer::<u8>::get(buffered.bind(py))?;
+    if !buffer.readonly() {
+        return Err(PyValueError::new_err("Received none read-only byte buffer"));
     }
+    let data_size = buffer.item_count();
+    if data_size < offset {
+        return error_buffer_exhausted();
+    }
+    let data_pointer = buffer.buf_ptr() as *const u8;
+    let data = unsafe { std::slice::from_raw_parts(data_pointer, data_size) };
+    return Ok(&data[offset..]);
+}
 
-    Err(PyValueError::new_err("Buffer is exhausted"))
+type OffsetResult<T> = PyResult<(T, usize)>;
+
+fn add_offset<T>(result: OffsetResult<T>, offset: usize) -> OffsetResult<T> {
+    match result {
+        Ok((value, local_offset)) => Ok((value, local_offset + offset)),
+        Err(_) => result,
+    }
+}
+
+fn internal_read_boolean(bytes: &[u8]) -> OffsetResult<bool> {
+    match bytes {
+        [0, ..] => Ok((false, 1)),
+        [1, ..] => Ok((true, 1)),
+        [] => return error_buffer_exhausted(),
+        _ => return Err(PyValueError::new_err("Invalid boolean value")),
+    }
 }
 
 #[pyfunction]
-pub fn read_int32(bytes: &PyBytes, offset: usize) -> PyResult<(i32, usize)> {
-    let end_offset = offset + 4;
+pub fn read_boolean(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<bool> {
+    add_offset(
+        internal_read_boolean(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, b, c, d, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((i32::from_be_bytes([*a, *b, *c, *d]), end_offset))
+fn internal_read_int8(bytes: &[u8]) -> OffsetResult<i8> {
+    match bytes {
+        [a, ..] => Ok((i8::from_be_bytes([*a]), 1)),
+        _ => error_buffer_exhausted(),
     }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
 #[pyfunction]
-pub fn read_int64(bytes: &PyBytes, offset: usize) -> PyResult<(i64, usize)> {
-    let end_offset = offset + 8;
+pub fn read_int8(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<i8> {
+    add_offset(
+        internal_read_int8(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, b, c, d, e, f, g, h, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((i64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]), end_offset))
+fn internal_read_int16(bytes: &[u8]) -> OffsetResult<i16> {
+    match bytes {
+        [a, b, ..] => Ok((i16::from_be_bytes([*a, *b]), 2)),
+        _ => error_buffer_exhausted(),
     }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
 #[pyfunction]
-pub fn read_uint8(bytes: &PyBytes, offset: usize) -> PyResult<(u8, usize)> {
-    let end_offset = offset + 1;
+pub fn read_int16(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<i16> {
+    add_offset(
+        internal_read_int16(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((u8::from_be_bytes([*a]), end_offset))
+fn internal_read_int32(bytes: &[u8]) -> OffsetResult<i32> {
+    match bytes {
+        [a, b, c, d, ..] => Ok((i32::from_be_bytes([*a, *b, *c, *d]), 4)),
+        _ => error_buffer_exhausted(),
     }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
 #[pyfunction]
-pub fn read_uint16(bytes: &PyBytes, offset: usize) -> PyResult<(u16, usize)> {
-    let end_offset = offset + 2;
+pub fn read_int32(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<i32> {
+    add_offset(
+        internal_read_int32(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, b, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((u16::from_be_bytes([*a, *b]), end_offset))
+fn internal_read_int64(bytes: &[u8]) -> OffsetResult<i64> {
+    match bytes {
+        [a, b, c, d, e, f, g, h, ..] => {
+            Ok((i64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]), 8))
+        }
+        _ => error_buffer_exhausted(),
     }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
 #[pyfunction]
-pub fn read_uint32(bytes: &PyBytes, offset: usize) -> PyResult<(u32, usize)> {
-    let end_offset = offset + 4;
+pub fn read_int64(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<i64> {
+    add_offset(
+        internal_read_int64(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, b, c, d, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((u32::from_be_bytes([*a, *b, *c, *d]), end_offset))
+fn internal_read_uint8(bytes: &[u8]) -> OffsetResult<u8> {
+    match bytes {
+        [a, ..] => Ok((u8::from_be_bytes([*a]), 1)),
+        _ => error_buffer_exhausted(),
     }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
 }
 
 #[pyfunction]
-pub fn read_uint64(bytes: &PyBytes, offset: usize) -> PyResult<(u64, usize)> {
-    let end_offset = offset + 8;
+pub fn read_uint8(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<u8> {
+    add_offset(
+        internal_read_uint8(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
 
-    if let [a, b, c, d, e, f, g, h, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((u64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]), end_offset))
+fn internal_read_uint16(bytes: &[u8]) -> OffsetResult<u16> {
+    match bytes {
+        [a, b, ..] => Ok((u16::from_be_bytes([*a, *b]), 2)),
+        _ => error_buffer_exhausted(),
     }
+}
 
-    Err(PyValueError::new_err("Buffer is exhausted"))
+#[pyfunction]
+pub fn read_uint16(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<u16> {
+    add_offset(
+        internal_read_uint16(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_uint32(bytes: &[u8]) -> OffsetResult<u32> {
+    match bytes {
+        [a, b, c, d, ..] => Ok((u32::from_be_bytes([*a, *b, *c, *d]), 4)),
+        _ => error_buffer_exhausted(),
+    }
+}
+
+#[pyfunction]
+pub fn read_uint32(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<u32> {
+    add_offset(
+        internal_read_uint32(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_uint64(bytes: &[u8]) -> OffsetResult<u64> {
+    match bytes {
+        [a, b, c, d, e, f, g, h, ..] => {
+            Ok((u64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]), 8))
+        }
+        _ => error_buffer_exhausted(),
+    }
+}
+
+#[pyfunction]
+pub fn read_uint64(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<u64> {
+    add_offset(
+        internal_read_uint64(data_from_input(py, buffered, offset)?),
+        offset,
+    )
 }
 
 // See description and Kafka implementation.
 // https://developers.google.com/protocol-buffers/docs/encoding?csw=1#varints
 // https://github.com/apache/kafka/blob/ef96ac07f565a73e35c5b0f4c56c8e87cfbaaf59/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L262
-#[pyfunction]
-pub fn read_unsigned_varint(bytes: &PyBytes, offset: usize) -> PyResult<(usize, usize)> {
+fn internal_read_unsigned_varint(bytes: &[u8]) -> OffsetResult<usize> {
     let mut result: usize = 0;
-    let real_bytes = &(bytes.as_bytes());
     let mut byte_count = 0;
     let mut shift: u8 = 0;
 
     loop {
         if byte_count == 5 {
             return Err(PyValueError::new_err(
-                "Varint is too long, the most significant bit in the 5th byte is set"
-            ))
+                "Varint is too long, the most significant bit in the 5th byte is set",
+            ));
         }
         // Read value by a byte at a time.
-        if let Some(byte) = real_bytes.get(offset + byte_count) {
+        if let Some(byte) = bytes.get(byte_count) {
             byte_count += 1;
             // Add 7 least significant bits to the result.
             let seven_bit_chunk = byte & 0b01111111;
@@ -155,321 +207,145 @@ pub fn read_unsigned_varint(bytes: &PyBytes, offset: usize) -> PyResult<(usize, 
             shift += 7;
             // If the most significant bit is 1, continue. Otherwise, stop.
             if byte & 0b10000000 == 0 {
-                break
+                break;
             }
         } else {
-            return Err(PyValueError::new_err("Buffer is exhauseted"))
+            return error_buffer_exhausted();
         }
     }
 
-    Ok((result, offset + byte_count))
+    Ok((result, byte_count))
 }
 
 #[pyfunction]
-pub fn read_float64(bytes: &PyBytes, offset: usize) -> PyResult<(f64, usize)> {
-    let end_offset = offset + 8;
-
-    if let [a, b, c, d, e, f, g, h, ..] = &(bytes.as_bytes())[offset..] {
-        return Ok((
-            f64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]),
-            end_offset,
-        ))
-    }
-
-    Err(PyValueError::new_err("Buffer is exhausted"))
+pub fn read_unsigned_varint(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<usize> {
+    add_offset(
+        internal_read_unsigned_varint(data_from_input(py, buffered, offset)?),
+        offset,
+    )
 }
 
-#[pyfunction]
-pub fn read_compact_string_as_bytes(bytes: &PyBytes, offset: usize) -> PyResult<(&PyBytes, usize)> {
-    match read_unsigned_varint(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((0, _)) => Err(
-            kio_errors::UnexpectedNull::new_err(
-                "Unexpectedly read null where compact string/bytes was expected"
-            )
-        ),
-        Ok((length, byte_offset)) => {
-            // String length is encoded with an offset of 1, to allow encoding
-            // null as 0.
-            let byte_end = byte_offset + length - 1;
-            let sliced = &bytes[byte_offset..byte_end];
-            let py_bytes = PyBytes::new(bytes.py(), sliced);
-            Ok((py_bytes, byte_end))
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_compact_string_as_bytes_nullable(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    match read_unsigned_varint(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((0, offset)) => Ok((load_none(bytes.py())?, offset)),
-        Ok((length, byte_offset)) => {
-            // String length is encoded with an offset of 1, to allow encoding
-            // null as 0.
-            let byte_end = byte_offset + length - 1;
-            let sliced = &bytes[byte_offset..byte_end];
-            let py_bytes = PyBytes::new(bytes.py(), sliced);
-            Ok((py_bytes, byte_end))
-        },
-    }
-}
-
-fn decode_compact_string(bytes: &PyBytes, offset: usize, length: usize) -> PyResult<(&PyAny, usize)> {
-    // String length is encoded with an offset of 1, to allow encoding
-    // null as 0.
-    let byte_end = offset + length - 1;
-    let sliced = &bytes[offset..byte_end];
-
-    match str::from_utf8(sliced) {
-        Err(_) => Err(
-            kio_errors::InvalidUnicode::new_err("Failed interpreting bytes as UTF-8")
-        ),
-        Ok(string) => {
-            let py_string = PyString::new(bytes.py(), string);
-            Ok((py_string, byte_end))
+fn internal_read_float64(bytes: &[u8]) -> OffsetResult<f64> {
+    match bytes {
+        [a, b, c, d, e, f, g, h, ..] => {
+            Ok((f64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h]), 8))
         }
+        _ => error_buffer_exhausted(),
     }
 }
 
 #[pyfunction]
-pub fn read_compact_string(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    match read_unsigned_varint(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((0, _)) => Err(
-            kio_errors::UnexpectedNull::new_err(
-                "Unexpectedly read null where compact string/bytes was expected"
-            )
-        ),
-        Ok((length, byte_offset)) => decode_compact_string(bytes, byte_offset, length)
-    }
+pub fn read_float64(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<f64> {
+    add_offset(
+        internal_read_float64(data_from_input(py, buffered, offset)?),
+        offset,
+    )
 }
 
-#[pyfunction]
-pub fn read_compact_string_nullable(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    match read_unsigned_varint(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((0, offset)) => Ok((load_none(bytes.py())?, offset)),
-        Ok((length, byte_offset)) => decode_compact_string(bytes, byte_offset, length)
-    }
-}
-
-fn slice_legacy_bytes(bytes: &PyBytes, offset: usize, length: usize) -> PyResult<(&PyAny, usize)> {
-    let byte_end = offset + length;
-    let sliced = &bytes[offset..byte_end];
-    let py_bytes = PyBytes::new(bytes.py(), sliced);
-    Ok((py_bytes, byte_end))
-}
-
-#[pyfunction]
-pub fn read_legacy_bytes(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL_VALUE: i16 = -1;
-
-    match read_int16(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((length, offset)) => {
-            match (usize::try_from(length), length) {
-                (Ok(length), _) => slice_legacy_bytes(bytes, offset, length),
-                (Err(_), NULL_VALUE) => Err(
-                    kio_errors::UnexpectedNull::new_err(
-                        "Unexpectedly read null where compact string/bytes was expected"
-                    )
-                ),
-                (Err(_), _) => Err(
-                    kio_errors::NegativeByteLength::new_err("Found negative byte length")
-                ),
-            }
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_nullable_legacy_bytes(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL_VALUE: i16 = -1;
-
-    match read_int16(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((length, offset)) => {
-            match (usize::try_from(length), length) {
-                (Ok(length), _) => slice_legacy_bytes(bytes, offset, length),
-                (Err(_), NULL_VALUE) => Ok((load_none(bytes.py())?, offset)),
-                (Err(_), _) => Err(
-                    kio_errors::NegativeByteLength::new_err("Found negative byte length")
-                ),
-            }
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_legacy_string(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL_VALUE: i16 = -1;
-
-    match read_int16(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((length, offset)) => {
-            match (usize::try_from(length), length) {
-                (Ok(length), _) => decode_compact_string(bytes, offset, length + 1),
-                (Err(_), NULL_VALUE) => Err(
-                    kio_errors::UnexpectedNull::new_err(
-                        "Unexpectedly read null where compact string/bytes was expected"
-                    )
-                ),
-                (Err(_), _) => Err(
-                    kio_errors::NegativeByteLength::new_err("Found negative byte length")
-                ),
-            }
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_nullable_legacy_string(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL_VALUE: i16 = -1;
-
-    match read_int16(bytes, offset) {
-        Err(error) => Err(error),
-        Ok((length, offset)) => {
-            match (usize::try_from(length), length) {
-                (Ok(length), _) => decode_compact_string(bytes, offset, length + 1),
-                (Err(_), NULL_VALUE) => Ok((load_none(bytes.py())?, offset)),
-                (Err(_), _) => Err(
-                    kio_errors::NegativeByteLength::new_err("Found negative byte length")
-                ),
-            }
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_legacy_array_length(bytes: &PyBytes, offset: usize) -> PyResult<(i32, usize)> {
-    read_int32(bytes, offset)
-}
-
-#[pyfunction]
-pub fn read_compact_array_length(bytes: &PyBytes, offset: usize) -> PyResult<(usize, usize)> {
-    match read_unsigned_varint(bytes, offset) {
-        Ok((0, _)) => Err(
-            kio_errors::NegativeByteLength::new_err("Found negative array length")
-        ),
-        // Kafka uses the array size plus 1.
-        Ok((value, offset)) => Ok((value - 1, offset)),
+fn internal_read_compact_string_as_bytes(bytes: &[u8]) -> OffsetResult<&[u8]> {
+    match internal_read_unsigned_varint(bytes) {
+        Ok((0, _)) => Err(kio_errors::UnexpectedNull::new_err(
+            "Unexpectedly read null where compact string/bytes was expected",
+        )),
+        Ok((length, byte_offset)) => {
+            // String length is encoded with an offset of 1, to allow encoding null as 0.
+            let byte_end = byte_offset + length - 1;
+            let sliced = &bytes[byte_offset..byte_end];
+            Ok((sliced, byte_end))
+        }
         Err(error) => Err(error),
     }
 }
 
 #[pyfunction]
-pub fn read_uuid(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL_VALUE: u32 = 0;
-    let byte_end = offset + 16;
-    let sliced = &bytes[offset..byte_end];
-    let byte_sum: u32 = sliced.iter().map(|&b| b as u32).sum();
-    let py = bytes.py();
-
-    match byte_sum.cmp(&NULL_VALUE) {
-        Ordering::Equal | Ordering::Less => Ok((load_none(bytes.py())?, byte_end)),
-        Ordering::Greater => {
-            let none = load_none(py)?;
-            let py_bytes = PyBytes::new(py, sliced);
-            let uuid_cls: Py<PyAny> = PyModule::import(py, "uuid")?.getattr("UUID")?.into();
-            // bytes is second key-word argument. We pass hex=None to avoid having to construct
-            // key-word arguments.
-            let args = (none, py_bytes);
-            let uuid_value = uuid_cls.call1(py, args)?.into_ref(py);
-            Ok((uuid_value, byte_end))
-        },
-    }
-}
-
-#[pyfunction]
-pub fn read_error_code(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    let py = bytes.py();
-    let error_code_cls: Py<PyAny> =
-        PyModule::import(py, "kio.static.constants")?
-            .getattr("ErrorCode")?
-            .into();
-    let (int_value, offset) = read_int16(bytes, offset)?;
-    let args = (int_value,);
-    let error_code = error_code_cls.call1(py, args)?.into_ref(py);
-    Ok((error_code, offset))
-}
-
-fn read_timedelta<T: IntoPy<Py<PyAny>>>(
-    bytes: &PyBytes,
+pub fn read_compact_string_as_bytes<'a>(
+    py: Python<'a>,
+    buffered: Py<PyAny>,
     offset: usize,
-    read_int: fn(&PyBytes, usize) -> PyResult<(T, usize)>,
-) -> PyResult<(&PyAny, usize)> {
-    let py = bytes.py();
-    let timedelta_cls: Py<PyAny> =
-        PyModule::import(py, "datetime")?
-            .getattr("timedelta")?
-            .into();
-    let (int_value, offset) = read_int(bytes, offset)?;
-    let args = (
-        0, // days
-        0, // seconds
-        0, // microseconds
-        int_value, // milliseconds
-    );
-    let timedelta = timedelta_cls.call1(py, args)?.into_ref(py);
-    Ok((timedelta, offset))
+) -> OffsetResult<&[u8]> {
+    add_offset(
+        internal_read_compact_string_as_bytes(data_from_input(py, buffered, offset)?),
+        offset,
+    )
 }
 
-#[pyfunction]
-pub fn read_timedelta_i32(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    read_timedelta(bytes, offset, read_int32)
-}
-
-#[pyfunction]
-pub fn read_timedelta_i64(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    read_timedelta(bytes, offset, read_int64)
-}
-
-fn as_datetime(py: Python, timestamp_ms: i64) -> PyResult<&PyAny> {
-    let datetime_cls: Py<PyAny> =
-        PyModule::import(py, "datetime")?
-            .getattr("datetime")?
-            .into();
-    let utc: Py<PyAny> =
-        PyModule::import(py, "datetime")?
-            .getattr("UTC")?
-            .into();
-    let args = (
-        timestamp_ms / 1000, // timestamp
-        utc, // timezone
-    );
-    Ok(datetime_cls.call_method1(py, "fromtimestamp", args)?.into_ref(py))
-}
-
-#[pyfunction]
-pub fn read_datetime_i64(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const ZERO: &i64 = &0;
-    let (timestamp_ms, offset) = read_int64(bytes, offset)?;
-    match timestamp_ms.ge(ZERO) {
-        true => Ok((as_datetime(bytes.py(), timestamp_ms)?, offset)),
-        false => Err(
-            kio_errors::OutOfBoundValue::new_err("Cannot parse negative timestamp")
-        )
+fn internal_read_compact_string_as_bytes_nullable(bytes: &[u8]) -> OffsetResult<Option<&[u8]>> {
+    match internal_read_unsigned_varint(bytes) {
+        Ok((0, offset)) => Ok((None, offset)),
+        Ok((length, byte_offset)) => {
+            // String length is encoded with an offset of 1, to allow encoding null as 0.
+            let byte_end = byte_offset + length - 1;
+            let sliced = &bytes[byte_offset..byte_end];
+            Ok((Some(sliced), byte_end))
+        }
+        Err(error) => Err(error),
     }
 }
 
 #[pyfunction]
-pub fn read_nullable_datetime_i64(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-    const NULL: &i64 = &-1;
-    let (timestamp_ms, offset) = read_int64(bytes, offset)?;
-    match timestamp_ms.cmp(NULL) {
-        Ordering::Greater => Ok((as_datetime(bytes.py(), timestamp_ms)?, offset)),
-        Ordering::Equal => Ok((load_none(bytes.py())?, offset)),
-        Ordering::Less => Err(
-            kio_errors::OutOfBoundValue::new_err("Cannot parse negative timestamp")
-        ),
+pub fn read_compact_string_as_bytes_nullable(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<&[u8]>> {
+    add_offset(
+        internal_read_compact_string_as_bytes_nullable(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn decode_compact_string(bytes: &[u8], offset: usize, length: usize) -> OffsetResult<&str> {
+    // String length is encoded with an offset of 1, to allow encoding null as 0.
+    let byte_end = offset + length - 1;
+    if bytes.len() < byte_end {
+        return error_buffer_exhausted();
+    }
+    let sliced = &bytes[offset..byte_end];
+    match std::str::from_utf8(sliced) {
+        Err(_) => Err(kio_errors::InvalidUnicode::new_err(
+            "Failed interpreting bytes as UTF-8",
+        )),
+        Ok(string) => Ok((string, byte_end)),
     }
 }
 
-// #[pyfunction]
-// pub fn compact_array_reader(bytes: &PyBytes, offset: usize) -> PyResult<(&PyAny, usize)> {
-//     let (array_length, offset) = read_compact_array_length(bytes, offset)?;
-// }
-//
-// #[pyfunction]
-// pub fn legacy_array_reader() {}
+fn internal_read_compact_string(bytes: &[u8]) -> OffsetResult<&str> {
+    match internal_read_unsigned_varint(bytes) {
+        Ok((0, _)) => Err(kio_errors::UnexpectedNull::new_err(
+            "Unexpectedly read null where compact string/bytes was expected",
+        )),
+        Ok((length, byte_offset)) => decode_compact_string(bytes, byte_offset, length),
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_compact_string(py: Python, buffered: Py<PyAny>, offset: usize) -> OffsetResult<&str> {
+    add_offset(
+        internal_read_compact_string(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}
+
+fn internal_read_compact_string_nullable(bytes: &[u8]) -> OffsetResult<Option<&str>> {
+    match internal_read_unsigned_varint(bytes) {
+        Ok((0, offset)) => Ok((None, offset)),
+        Ok((length, byte_offset)) => {
+            let (decoded, end_offset) = decode_compact_string(bytes, byte_offset, length)?;
+            Ok((Some(decoded), end_offset))
+        },
+        Err(error) => Err(error),
+    }
+}
+
+#[pyfunction]
+pub fn read_compact_string_nullable(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<&str>> {
+    add_offset(
+        internal_read_compact_string_nullable(data_from_input(py, buffered, offset)?),
+        offset,
+    )
+}

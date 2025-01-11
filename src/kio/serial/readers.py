@@ -288,10 +288,71 @@ def read_nullable_datetime_i64(buffer: memoryview) -> BufferAnd[TZAware | None]:
     return remaining, _tz_aware_from_i64(timestamp)
 
 
-# try:
-#     import _kio_core
-# except ImportError:
-#     print("No compiled _kio_core found")
-# else:
-#     for name in _kio_core.__all__:
-#         globals()[name] = _kio_core.__dict__[name]
+try:
+    import _kio_core
+except ImportError:
+    print("No compiled _kio_core found")
+else:
+    for name in _kio_core.__all__:
+        globals()[name] = _kio_core.__dict__[name]
+
+
+val = read_boolean(b"\x01123", 0)
+assert val == (True, 1), val
+val = read_boolean(b"\x00123", 0)
+assert val == (False, 1), val
+
+val = read_boolean(b"\x00\x01", 0)
+assert val == (False, 1), val
+val = read_boolean(b"\x00\x01", 1)
+assert val == (True, 2), val
+val = read_compact_string_as_bytes(b"\x04barfar", 0)
+assert val == (b"bar", 4)
+
+val = read_compact_string_as_bytes_nullable(b"\x04barfar", 0)
+assert val == (b"bar", 4)
+
+val = read_compact_string_as_bytes_nullable(b"\x00barfar", 0)
+assert val == (None, 1), val
+
+val = read_int8(b"\x01123", 0)
+assert val == (1, 1), val
+val = read_int8(b"\x00123", 0)
+assert val == (0, 1), val
+
+assert read_unsigned_varint(b"2", 0) == (50, 1)
+val = read_unsigned_varint(b"u2Foo", 1)
+assert val == (50, 2), val
+
+val = read_compact_string( b"\x06hello", 0)
+assert val == ("hello", 6), val
+
+val = read_compact_string( b"xx\x06hello", 2)
+assert val == ("hello", 8), val
+
+value = "The quick brown 🦊 jumps over the lazy dog 🧖"
+byte_value = value.encode()
+byte_length = len(byte_value) + 1  # string length is offset by one
+prefixed = b"xxx" + byte_length.to_bytes(1, "little") + byte_value
+val = read_compact_string(prefixed + b"| cruft", 3)
+assert val == (value, len(prefixed))
+
+try: read_compact_string(b"doot\x20hello there \xf0\x9f\x91\x8b", 4)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
+try: read_compact_string(b"\x00", 0)
+except UnexpectedNull: pass
+else: assert False
+
+try: read_compact_string(b"cruft|\x00|cruft", 6)
+except UnexpectedNull: pass
+else: assert False
+
+val = read_compact_string_nullable( b"xx\x06hello", 2)
+assert val == ("hello", 8), val
+assert read_compact_string_nullable(b"\x00", 0) == (None, 1)
+assert read_compact_string_nullable(b"cruft|\x00|cruft", 6) == (None, 7)
+
+print("ok")
+raise SystemExit

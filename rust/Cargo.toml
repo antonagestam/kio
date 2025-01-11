@@ -11,4 +11,4 @@ name = "_kio_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.2"
+pyo3 = "0.23.3"
