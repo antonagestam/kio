@@ -17,6 +17,8 @@ mod _kio_core {
     #[pymodule_export]
     use crate::readers::read_compact_string_nullable;
     #[pymodule_export]
+    use crate::readers::read_datetime_i64;
+    #[pymodule_export]
     use crate::readers::read_error_code;
     #[pymodule_export]
     use crate::readers::read_float64;
@@ -34,6 +36,8 @@ mod _kio_core {
     use crate::readers::read_legacy_bytes;
     #[pymodule_export]
     use crate::readers::read_legacy_string;
+    #[pymodule_export]
+    use crate::readers::read_nullable_datetime_i64;
     #[pymodule_export]
     use crate::readers::read_nullable_legacy_bytes;
     #[pymodule_export]

@@ -601,3 +601,60 @@ pub fn read_timedelta_i64(
     let timedelta = instantiate_timedelta(py, int_value)?;
     add_offset(Ok((timedelta, end_offset)), offset)
 }
+
+fn as_datetime<'a>(py: Python<'a>, timestamp_ms: i64) -> PyResult<Py<PyAny>> {
+    let module = PyModule::import(py, "datetime")?;
+    let cls: Py<PyAny> = module.getattr("datetime")?.into();
+    let tz: Py<PyAny> = module.getattr("UTC")?.into();
+    let args = (timestamp_ms / 1000, tz);
+    Ok(cls.call_method1(py, "fromtimestamp", args)?.into())
+}
+
+const DATETIME_I64_NULL: &i64 = &-1;
+
+fn internal_read_datetime_i64(bytes: &[u8]) -> OffsetResult<i64> {
+    let (timestamp_ms, offset) = internal_read_int64(bytes)?;
+    match timestamp_ms.gt(DATETIME_I64_NULL) {
+        true => Ok((timestamp_ms, offset)),
+        false => Err(kio_errors::OutOfBoundValue::new_err(
+            "Cannot parse negative timestamp",
+        )),
+    }
+}
+
+#[pyfunction]
+pub fn read_datetime_i64(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Py<PyAny>> {
+    let (timestamp_ms, end_offset) =
+        internal_read_datetime_i64(data_from_input(py, buffered, offset)?)?;
+    let datetime = as_datetime(py, timestamp_ms)?;
+    add_offset(Ok((datetime, end_offset)), offset)
+}
+
+fn internal_read_nullable_datetime_i64(bytes: &[u8]) -> OffsetResult<Option<i64>> {
+    let (timestamp_ms, offset) = internal_read_int64(bytes)?;
+    match timestamp_ms.cmp(DATETIME_I64_NULL) {
+        Ordering::Greater => Ok((Some(timestamp_ms), offset)),
+        Ordering::Equal => Ok((None, offset)),
+        Ordering::Less => Err(kio_errors::OutOfBoundValue::new_err(
+            "Cannot parse negative timestamp",
+        )),
+    }
+}
+
+#[pyfunction]
+pub fn read_nullable_datetime_i64(
+    py: Python,
+    buffered: Py<PyAny>,
+    offset: usize,
+) -> OffsetResult<Option<Py<PyAny>>> {
+    let result = match internal_read_nullable_datetime_i64(data_from_input(py, buffered, offset)?)?
+    {
+        (Some(timestamp_ms), end_offset) => Ok((Some(as_datetime(py, timestamp_ms)?), end_offset)),
+        (None, end_offset) => Ok((None, end_offset)),
+    };
+    add_offset(result, offset)
+}

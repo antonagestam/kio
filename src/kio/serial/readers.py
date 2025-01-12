@@ -389,5 +389,25 @@ try: read_timedelta_i64(b"", 0)
 except ValueError as exc: assert str(exc) == "Buffer is exhausted"
 else: assert False
 
+val = read_datetime_i64(b"\x00" * 8, 0)
+assert val == (datetime.datetime(1970,1,1, tzinfo=datetime.UTC), 8), val
+try: read_datetime_i64(b"\xff" * 8, 0)  # -1
+except OutOfBoundValue: pass
+else: assert False
+try: read_datetime_i64(b"", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
+val = read_nullable_datetime_i64(b"\x00" * 8, 0)
+assert val == (datetime.datetime(1970,1,1, tzinfo=datetime.UTC), 8), val
+val = read_nullable_datetime_i64(b"\xff" * 8, 0)  # -1
+assert val == (None, 8), val
+try: read_nullable_datetime_i64(b"\xff" * 7 + b"\xfe" , 0)  # -2
+except OutOfBoundValue: pass
+else: assert False
+try: read_nullable_datetime_i64(b"", 0)
+except ValueError as exc: assert str(exc) == "Buffer is exhausted"
+else: assert False
+
 print("ok")
 raise SystemExit
