@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import Field
 from dataclasses import fields
 from typing import Literal
@@ -18,7 +20,6 @@ from ._introspect import get_field_tag
 from ._introspect import get_schema_field_type
 from ._introspect import is_optional
 from ._shared import NullableEntityMarker
-from .readers import BufferAnd
 from .readers import read_int8
 
 

@@ -1,6 +1,6 @@
-from typing import TypeVar
+from __future__ import annotations
 
-from kio.serial.readers import BufferAnd
+from typing import TypeVar
 
 T = TypeVar("T")
 

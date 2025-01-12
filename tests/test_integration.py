@@ -51,7 +51,7 @@ from kio.schema.types import TopicName
 from kio.schema.types import TransactionalId
 from kio.serial import entity_reader
 from kio.serial import entity_writer
-from kio.serial.readers import BufferAnd
+from kio.serial.readers import SizedResult
 from kio.serial.readers import read_int32
 from kio.serial.writers import Writable
 from kio.serial.writers import write_int32
@@ -152,7 +152,7 @@ def parse_response(
     buffer: memoryview,
     response_type: type[R],
     correlation_id: i32,
-) -> BufferAnd[R]:
+) -> SizedResult[R]:
     header_schema: Any = response_type.__header_schema__
     read_header = entity_reader(header_schema)
     remaining, header = read_header(buffer)
