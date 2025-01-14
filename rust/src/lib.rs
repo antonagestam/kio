@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 mod readers;
+mod parse;
 
 #[pymodule]
 mod _kio_core {
@@ -58,4 +59,6 @@ mod _kio_core {
     use crate::readers::read_unsigned_varint;
     #[pymodule_export]
     use crate::readers::read_uuid;
+    #[pymodule_export]
+    use crate::parse::get_reader;
 }

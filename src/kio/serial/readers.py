@@ -345,7 +345,8 @@ except ImportError:
     logger.debug("No compiled _kio_core found, using pure Python implementation")
 else:
     for name in _kio_core.__all__:
+        if not name in globals(): continue
         imported = _kio_core.__dict__[name]
         imported.__module__ = __name__
         # fixme
-        # globals()[name] = imported
+        globals()[name] = imported

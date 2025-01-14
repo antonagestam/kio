@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import Field
 from dataclasses import fields
-from typing import Literal
+from typing import Literal, Final
 from typing import TypeVar
 from typing import assert_never
 from typing import overload
@@ -20,7 +21,8 @@ from ._introspect import get_field_tag
 from ._introspect import get_schema_field_type
 from ._introspect import is_optional
 from ._shared import NullableEntityMarker
-from .readers import read_int8
+
+logger: Final = logging.getLogger(__name__)
 
 
 def get_reader(
@@ -210,3 +212,16 @@ def entity_reader(
         )
 
     return read_nullable_entity
+
+
+try:
+    import _kio_core
+except ImportError:
+    logger.debug("No compiled _kio_core found, using pure Python implementation")
+else:
+    for name in _kio_core.__all__:
+        if not name in globals(): continue
+        imported = _kio_core.__dict__[name]
+        imported.__module__ = __name__
+        # fixme
+        globals()[name] = imported
