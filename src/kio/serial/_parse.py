@@ -1,26 +1,37 @@
 from __future__ import annotations
 
 import logging
+
+from collections.abc import Mapping
+from collections.abc import Sequence
 from dataclasses import Field
+from dataclasses import dataclass
 from dataclasses import fields
-from typing import Literal, Final
+from typing import Final
+from typing import Generic
+from typing import Literal
+from typing import TypeAlias
 from typing import TypeVar
 from typing import assert_never
+from typing import final
 from typing import overload
 
-from kio._utils import cache
-from kio.static.protocol import Entity
+from typing_extensions import Buffer
 
-from . import readers
-from ._introspect import EntityField
-from ._introspect import EntityTupleField
-from ._introspect import PrimitiveField
-from ._introspect import PrimitiveTupleField
-from ._introspect import classify_field
-from ._introspect import get_field_tag
-from ._introspect import get_schema_field_type
-from ._introspect import is_optional
-from ._shared import NullableEntityMarker
+from kio._utils import cache
+from kio.serial import readers
+from kio.serial._introspect import EntityField
+from kio.serial._introspect import EntityTupleField
+from kio.serial._introspect import PrimitiveField
+from kio.serial._introspect import PrimitiveTupleField
+from kio.serial._introspect import classify_field
+from kio.serial._introspect import get_field_tag
+from kio.serial._introspect import get_schema_field_type
+from kio.serial._introspect import is_optional
+from kio.serial._shared import NullableEntityMarker
+from kio.serial.readers import Reader
+from kio.serial.readers import SizedResult
+from kio.static.protocol import Entity
 
 logger: Final = logging.getLogger(__name__)
 
@@ -138,6 +149,110 @@ def get_field_reader(
 
 
 E = TypeVar("E", bound=Entity)
+FieldReaderPair: TypeAlias = tuple[Field[T], Reader[T]]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _BaseSchema(Generic[E]):
+    entity_type: type[E]
+    field_readers: Sequence[FieldReaderPair[object]]
+    tagged_field_readers: Mapping[int, FieldReaderPair[object]]
+
+
+@final
+class _NonNullableSchema(_BaseSchema[E], Generic[E]): ...
+
+
+@final
+class _NullableSchema(_BaseSchema[E], Generic[E]): ...
+
+
+_Schema: TypeAlias = _NonNullableSchema[E] | _NullableSchema[E]
+
+
+def _compile_schema(
+    entity_type: type[E],
+    nullable: bool,
+) -> _Schema[E]:
+    field_readers = []
+    tagged_field_readers = {}
+    is_request_header = entity_type.__name__ == "RequestHeader"
+
+    for field in fields(entity_type):
+        tag = get_field_tag(field)
+        field_reader = get_field_reader(
+            entity_type=entity_type,
+            field=field,
+            is_request_header=is_request_header,
+            is_tagged_field=tag is not None,
+        )
+        if tag is not None:
+            tagged_field_readers[tag] = (field, field_reader)
+        else:
+            field_readers.append((field, field_reader))
+
+    # Assert we don't find tags for non-flexible models.
+    if tagged_field_readers and not entity_type.__flexible__:
+        raise ValueError("Found tagged fields on a non-flexible model")
+
+    if nullable:
+        return _NullableSchema(
+            entity_type=entity_type,
+            field_readers=field_readers,
+            tagged_field_readers=tagged_field_readers,
+        )
+    else:
+        return _NonNullableSchema(
+            entity_type=entity_type,
+            field_readers=field_readers,
+            tagged_field_readers=tagged_field_readers,
+        )
+
+
+@overload
+def _read_compiled(
+    buffer: Buffer,
+    offset: int,
+    schema: _NullableSchema[E],
+) -> SizedResult[E | None]: ...
+@overload
+def _read_compiled(
+    buffer: Buffer,
+    offset: int,
+    schema: _NonNullableSchema[E],
+) -> SizedResult[E]: ...
+def _read_compiled(
+    buffer: Buffer,
+    offset: int,
+    schema: _NonNullableSchema[E] | _NullableSchema[E],
+) -> SizedResult[E | None]:
+    # Handle nullable entity fields.
+    # This is undocumented behavior, formalized in KIP-893.
+    # https://cwiki.apache.org/confluence/display/KAFKA/KIP-893%3A+The+Kafka+protocol+should+support+nullable+structs
+    if isinstance(schema, _NullableSchema):
+        marker_int, offset = readers.read_int8(buffer, offset)
+        if NullableEntityMarker(marker_int) is NullableEntityMarker.null:
+            return None, offset
+
+    # Read regular fields.
+    kwargs = {}
+    for field, field_reader in schema.field_readers:
+        kwargs[field.name], offset = field_reader(buffer, offset)
+
+    # For non-flexible entities we're done here.
+    if not schema.entity_type.__flexible__:
+        return schema.entity_type(**kwargs), offset
+
+    # Read tagged fields.
+    num_tagged_fields, offset = readers.read_unsigned_varint(buffer, offset)
+    for _ in range(num_tagged_fields):
+        field_tag, offset = readers.read_unsigned_varint(buffer, offset)
+        # Ignore field length.
+        _, offset = readers.read_unsigned_varint(buffer, offset)
+        field, field_reader = schema.tagged_field_readers[field_tag]
+        kwargs[field.name], offset = field_reader(buffer, offset)
+
+    return schema.entity_type(**kwargs), offset
 
 
 @overload
@@ -155,72 +270,24 @@ def entity_reader(
     entity_type: type[E],
     nullable: bool = False,
 ) -> readers.Reader[E | None]:
-    field_readers = {}
-    tagged_field_readers = {}
-    is_request_header = entity_type.__name__ == "RequestHeader"
+    def read_entity(
+        buffer: Buffer,
+        offset: int,
+        _readable_schema: _Schema[E] = _compile_schema(entity_type, nullable),
+    ) -> readers.SizedResult[E | None]:
+        return _read_compiled(buffer, offset, _readable_schema)
 
-    for field in fields(entity_type):
-        tag = get_field_tag(field)
-        field_reader = get_field_reader(
-            entity_type=entity_type,
-            field=field,
-            is_request_header=is_request_header,
-            is_tagged_field=tag is not None,
-        )
-        if tag is not None:
-            tagged_field_readers[tag] = field, field_reader
-        else:
-            field_readers[field] = field_reader
-
-    # Assert we don't find tags for non-flexible models.
-    if tagged_field_readers and not entity_type.__flexible__:
-        raise ValueError("Found tagged fields on a non-flexible model")
-
-    def read_entity(buffer: memoryview) -> BufferAnd[E]:
-        # Read regular fields.
-        kwargs = {}
-        for field, field_reader in field_readers.items():
-            buffer, kwargs[field.name] = field_reader(buffer)
-
-        # For non-flexible entities we're done here.
-        if not entity_type.__flexible__:
-            return buffer, entity_type(**kwargs)
-
-        # Read tagged fields.
-        buffer, num_tagged_fields = readers.read_unsigned_varint(buffer)
-        for _ in range(num_tagged_fields):
-            buffer, field_tag = readers.read_unsigned_varint(buffer)
-            # Ignore field length.
-            buffer, _ = readers.read_unsigned_varint(buffer)
-            field, field_reader = tagged_field_readers[field_tag]
-            buffer, kwargs[field.name] = field_reader(buffer)
-
-        return buffer, entity_type(**kwargs)
-
-    if not nullable:
-        return read_entity
-
-    # This is undocumented behavior, formalized in KIP-893.
-    # https://cwiki.apache.org/confluence/display/KAFKA/KIP-893%3A+The+Kafka+protocol+should+support+nullable+structs
-    def read_nullable_entity(buffer: memoryview) -> BufferAnd[E | None]:
-        buffer, marker_int = read_int8(buffer)
-        marker = NullableEntityMarker(marker_int)
-        return (
-            (buffer, None)
-            if marker is NullableEntityMarker.null
-            else read_entity(buffer)
-        )
-
-    return read_nullable_entity
+    return read_entity
 
 
 try:
-    import _kio_core
+    import _kio_core  # type: ignore[import-untyped]
 except ImportError:
     logger.debug("No compiled _kio_core found, using pure Python implementation")
 else:
     for name in _kio_core.__all__:
-        if not name in globals(): continue
+        if name not in globals():
+            continue
         imported = _kio_core.__dict__[name]
         imported.__module__ = __name__
         # fixme

@@ -35,16 +35,17 @@ from .errors import UnexpectedNull
 logger: Final = logging.getLogger(__name__)
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 SizedResult: TypeAlias = tuple[T, int]
 
 
-class Reader(Protocol[T]):
+class Reader(Protocol[T_co]):
     def __call__(
         self,
         buffer: Buffer,
         offset: int,
         /,
-    ) -> SizedResult[T]: ...
+    ) -> SizedResult[T_co]: ...
 
 
 def _read_exact(
@@ -74,47 +75,47 @@ def _take_bytes(byte_size: int) -> Callable[[Callable[[memoryview], T]], Reader[
 
 @_take_bytes(1)
 def read_boolean(value_bytes: memoryview) -> bool:
-    return struct.unpack(">?", value_bytes)[0]
+    return struct.unpack(">?", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(1)
 def read_int8(value_bytes: memoryview, /) -> i8:
-    return struct.unpack(">b", value_bytes)[0]
+    return struct.unpack(">b", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(2)
 def read_int16(value_bytes: memoryview, /) -> i16:
-    return struct.unpack(">h", value_bytes)[0]
+    return struct.unpack(">h", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(4)
 def read_int32(value_bytes: memoryview, /) -> i32:
-    return struct.unpack(">i", value_bytes)[0]
+    return struct.unpack(">i", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(8)
 def read_int64(value_bytes: memoryview) -> i64:
-    return struct.unpack(">q", value_bytes)[0]
+    return struct.unpack(">q", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(1)
 def read_uint8(value_bytes: memoryview) -> u8:
-    return struct.unpack(">B", value_bytes)[0]
+    return struct.unpack(">B", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(2)
 def read_uint16(value_bytes: memoryview) -> u16:
-    return struct.unpack(">H", value_bytes)[0]
+    return struct.unpack(">H", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(4)
 def read_uint32(value_bytes: memoryview) -> u32:
-    return struct.unpack(">I", value_bytes)[0]
+    return struct.unpack(">I", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 @_take_bytes(8)
 def read_uint64(value_bytes: memoryview) -> u64:
-    return struct.unpack(">Q", value_bytes)[0]
+    return struct.unpack(">Q", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 # See description and upstream implementation.
@@ -140,7 +141,7 @@ def read_unsigned_varint(buffer: Buffer, offset: int, /) -> SizedResult[int]:
 
 @_take_bytes(8)
 def read_float64(value_bytes: memoryview) -> float:
-    return struct.unpack(">d", value_bytes)[0]
+    return struct.unpack(">d", value_bytes)[0]  # type: ignore[no-any-return]
 
 
 def read_compact_string_as_bytes(buffer: Buffer, offset: int, /) -> SizedResult[bytes]:
@@ -340,12 +341,13 @@ def read_nullable_datetime_i64(
 
 
 try:
-    import _kio_core
+    import _kio_core  # type: ignore[import-untyped]
 except ImportError:
     logger.debug("No compiled _kio_core found, using pure Python implementation")
 else:
     for name in _kio_core.__all__:
-        if not name in globals(): continue
+        if name not in globals():
+            continue
         imported = _kio_core.__dict__[name]
         imported.__module__ = __name__
         # fixme
