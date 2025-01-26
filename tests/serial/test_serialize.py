@@ -21,7 +21,7 @@ from kio.serial import writers
 from kio.serial._serialize import get_field_writer
 from kio.serial._serialize import get_writer
 from kio.serial._shared import NullableEntityMarker
-from kio.serial.readers import read_boolean
+from kio.serial.readers import read_boolean, Reader
 from kio.serial.readers import read_compact_array_length
 from kio.serial.readers import read_compact_string
 from kio.serial.readers import read_compact_string_nullable
@@ -35,6 +35,7 @@ from kio.static.primitive import i8
 from kio.static.primitive import i16
 from kio.static.primitive import i32
 from kio.static.primitive import i32Timedelta
+from tests.read import read, exhaust
 from tests.read_exhausted import exhausted
 
 
@@ -180,13 +181,14 @@ class TestGetFieldWriter:
         # sure it behaves like one.
         writer(buffer, [1, 2, 3])
 
-        remaining, length = read_compact_array_length(buffer.getbuffer())
+        data = buffer.getbuffer()
+        length, remaining = read(read_compact_array_length, data)
         assert length == 3
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 1
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 2
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 3
 
     def test_returns_entity_writer_for_entity_field(
@@ -209,10 +211,10 @@ class TestGetFieldWriter:
 
         writer(buffer, A(f=i8(23)))
 
-        remaining, value = read_int8(buffer.getbuffer())
+        value, remaining = read(read_int8, buffer.getbuffer())
         assert value == 23
         # tags
-        assert exhausted(read_unsigned_varint(remaining)) == 0
+        assert exhaust(read_unsigned_varint, remaining) == 0
 
     def test_returns_entity_writer_for_nullable_entity_field(
         self,
@@ -235,13 +237,13 @@ class TestGetFieldWriter:
         writer(buffer, A(f=i8(23)))
         writer(buffer, None)
 
-        remaining, marker_value = read_int8(buffer.getbuffer())
+        marker_value, remaining = read(read_int8, buffer.getbuffer())
         assert NullableEntityMarker(marker_value) is NullableEntityMarker.not_null
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 23
-        remaining, tags = read_unsigned_varint(remaining)
+        tags, remaining = read(read_unsigned_varint, remaining)
         assert tags == 0
-        marker_value = exhausted(read_int8(remaining))
+        marker_value= exhaust(read_int8, remaining)
         assert NullableEntityMarker(marker_value) is NullableEntityMarker.null
 
     def test_returns_entity_tuple_writer_for_entity_tuple_field(
@@ -264,15 +266,15 @@ class TestGetFieldWriter:
 
         writer(buffer, [A(f=i8(23)), A(f=i8(17))])
 
-        remaining, value = read_compact_array_length(buffer.getbuffer())
+        value, remaining = read(read_compact_array_length, buffer.getbuffer())
         assert value == 2
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 23
-        remaining, tags = read_unsigned_varint(remaining)
+        tags, remaining = read(read_unsigned_varint, remaining)
         assert tags == 0
-        remaining, value = read_int8(remaining)
+        value, remaining = read(read_int8, remaining)
         assert value == 17
-        tags = exhausted(read_unsigned_varint(remaining))
+        tags = exhaust(read_unsigned_varint, remaining)
         assert tags == 0
 
 
@@ -339,73 +341,73 @@ def test_serialize_complex_entity(buffer: io.BytesIO) -> None:
     write_metadata_response(buffer, instance)
 
     # throttle time
-    remaining, throttle_time = read_int32(buffer.getbuffer())
+    throttle_time, remaining = read(read_int32, buffer.getbuffer())
     assert throttle_time == 123
 
     # brokers
-    remaining, brokers = read_compact_array_length(remaining)
+    brokers, remaining = read(read_compact_array_length, remaining)
     assert brokers == 2
     for i in range(1, 3):
-        remaining, node_id = read_int32(remaining)
+        node_id, remaining = read(read_int32, remaining)
         assert node_id == i
-        remaining, host = read_compact_string(remaining)
+        host, remaining = read(read_compact_string, remaining)
         assert host == "foo.bar"
-        remaining, port = read_int32(remaining)
+        port, remaining = read(read_int32, remaining)
         assert port == 1234
-        remaining, rack = read_compact_string_nullable(remaining)
+        rack, remaining = read(read_compact_string_nullable, remaining)
         assert rack is None
-        remaining, tagged_fields = read_unsigned_varint(remaining)
+        tagged_fields, remaining = read(read_unsigned_varint, remaining)
         assert tagged_fields == 0
 
-    remaining, cluster_id = read_compact_string_nullable(remaining)
+    cluster_id, remaining = read(read_compact_string_nullable, remaining)
     assert cluster_id == "556"
 
-    remaining, controller_id = read_int32(remaining)
+    controller_id, remaining = read(read_int32, remaining)
     assert controller_id == 3
 
     # topics
-    remaining, topics = read_compact_array_length(remaining)
+    topics, remaining = read(read_compact_array_length, remaining)
     assert topics == 1
     for _ in range(1):
-        remaining, error_code = read_int16(remaining)
+        error_code, remaining = read(read_int16, remaining)
         assert error_code == ErrorCode.kafka_storage_error.value
-        remaining, name = read_compact_string_nullable(remaining)
+        name, remaining = read(read_compact_string_nullable, remaining)
         assert name == "topic 1"
-        remaining, parsed_topic_id = read_uuid(remaining)
+        parsed_topic_id, remaining = read(read_uuid, remaining)
         assert parsed_topic_id == topic_id
-        remaining, is_internal = read_boolean(remaining)
+        is_internal, remaining = read(read_boolean, remaining)
         assert is_internal is False
         # partitions
-        remaining, partitions = read_compact_array_length(remaining)
+        partitions, remaining = read(read_compact_array_length, remaining)
         assert partitions == 1
         for __ in range(1):
-            remaining, error_code = read_int16(remaining)
+            error_code, remaining = read(read_int16, remaining)
             assert error_code == ErrorCode.delegation_token_expired.value
-            remaining, partition_index = read_int32(remaining)
+            partition_index, remaining = read(read_int32, remaining)
             assert partition_index == 5679
-            remaining, leader_id = read_int32(remaining)
+            leader_id, remaining = read(read_int32, remaining)
             assert leader_id == 2345
-            remaining, leader_epoch = read_int32(remaining)
+            leader_epoch, remaining = read(read_int32, remaining)
             assert leader_epoch == 6445678
-            remaining, replica_nodes = read_compact_array_length(remaining)
+            replica_nodes, remaining = read(read_compact_array_length, remaining)
             assert replica_nodes == 2
-            remaining, replica_node = read_int32(remaining)
+            replica_node, remaining = read(read_int32, remaining)
             assert replica_node == 12345
-            remaining, replica_node = read_int32(remaining)
+            replica_node, remaining = read(read_int32, remaining)
             assert replica_node == 7651
-            remaining, isr_nodes = read_compact_array_length(remaining)
+            isr_nodes, remaining = read(read_compact_array_length, remaining)
             assert isr_nodes == 0
-            remaining, offline_replicas = read_compact_array_length(remaining)
+            offline_replicas, remaining = read(read_compact_array_length, remaining)
             assert offline_replicas == 0
-            remaining, partition_tagged_fields = read_unsigned_varint(remaining)
+            partition_tagged_fields, remaining = read(read_unsigned_varint, remaining)
             assert partition_tagged_fields == 0
-        remaining, topic_authorized_operations = read_int32(remaining)
+        topic_authorized_operations, remaining = read(read_int32, remaining)
         assert topic_authorized_operations == 765443
-        remaining, topic_tagged_fields = read_unsigned_varint(remaining)
+        topic_tagged_fields, remaining = read(read_unsigned_varint, remaining)
         assert topic_tagged_fields == 0
 
     # main entity tagged fields
-    assert exhausted(read_unsigned_varint(remaining)) == 0
+    assert exhaust(read_unsigned_varint,remaining) == 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -434,15 +436,15 @@ def test_can_write_populated_nested_nullable_entity(buffer: io.BytesIO) -> None:
     )
     write_nested_nullable(buffer, instance)
 
-    remaining, null_marker = read_int8(buffer.getbuffer())
+    null_marker, remaining = read(read_int8, buffer.getbuffer())
     assert null_marker == NullableEntityMarker.not_null.value
-    remaining, child_name = read_compact_string(remaining)
+    child_name, remaining = read(read_compact_string, remaining)
     assert child_name == "child name"
-    remaining, tagged_fields = read_unsigned_varint(remaining)
+    tagged_fields, remaining = read(read_unsigned_varint, remaining)
     assert tagged_fields == 0
-    remaining, parent_name = read_compact_string(remaining)
+    parent_name, remaining = read(read_compact_string, remaining)
     assert parent_name == "parent name"
-    tagged_fields = exhausted(read_unsigned_varint(remaining))
+    tagged_fields = exhaust(read_unsigned_varint, remaining)
     assert tagged_fields == 0
 
 
@@ -454,9 +456,9 @@ def test_can_write_empty_nested_nullable_entity(buffer: io.BytesIO) -> None:
     )
     write_nested_nullable(buffer, instance)
 
-    remaining, null_marker = read_int8(buffer.getbuffer())
+    null_marker, remaining = read(read_int8, buffer.getbuffer())
     assert null_marker == NullableEntityMarker.null.value
-    remaining, parent_name = read_compact_string(remaining)
+    parent_name, remaining = read(read_compact_string, remaining)
     assert parent_name == "parent name"
-    tagged_fields = exhausted(read_unsigned_varint(remaining))
+    tagged_fields = exhaust(read_unsigned_varint, remaining)
     assert tagged_fields == 0

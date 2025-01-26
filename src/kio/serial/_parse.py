@@ -226,33 +226,41 @@ def _read_compiled(
     offset: int,
     schema: _NonNullableSchema[E] | _NullableSchema[E],
 ) -> SizedResult[E | None]:
+    size = 0
+
     # Handle nullable entity fields.
     # This is undocumented behavior, formalized in KIP-893.
     # https://cwiki.apache.org/confluence/display/KAFKA/KIP-893%3A+The+Kafka+protocol+should+support+nullable+structs
     if isinstance(schema, _NullableSchema):
-        marker_int, offset = readers.read_int8(buffer, offset)
+        marker_int, add_size = readers.read_int8(buffer, offset)
+        size += add_size
         if NullableEntityMarker(marker_int) is NullableEntityMarker.null:
-            return None, offset
+            return None, size
 
     # Read regular fields.
     kwargs = {}
     for field, field_reader in schema.field_readers:
-        kwargs[field.name], offset = field_reader(buffer, offset)
+        kwargs[field.name], add_size = field_reader(buffer, offset + size)
+        size += add_size
 
     # For non-flexible entities we're done here.
     if not schema.entity_type.__flexible__:
-        return schema.entity_type(**kwargs), offset
+        return schema.entity_type(**kwargs), size
 
     # Read tagged fields.
-    num_tagged_fields, offset = readers.read_unsigned_varint(buffer, offset)
+    num_tagged_fields, num_size = readers.read_unsigned_varint(buffer, offset + size)
+    size += num_size
     for _ in range(num_tagged_fields):
-        field_tag, offset = readers.read_unsigned_varint(buffer, offset)
+        field_tag, add_size = readers.read_unsigned_varint(buffer, offset + size)
+        size += add_size
         # Ignore field length.
-        _, offset = readers.read_unsigned_varint(buffer, offset)
+        _, add_size = readers.read_unsigned_varint(buffer, offset + size)
+        size += add_size
         field, field_reader = schema.tagged_field_readers[field_tag]
-        kwargs[field.name], offset = field_reader(buffer, offset)
+        kwargs[field.name], add_size = field_reader(buffer, offset + size)
+        size += add_size
 
-    return schema.entity_type(**kwargs), offset
+    return schema.entity_type(**kwargs), size
 
 
 @overload

@@ -49,8 +49,9 @@ def test_can_parse_flexible_entity_array(buffer: io.BytesIO) -> None:
     # Parent tagged fields
     write_empty_tagged_fields(buffer)
 
-    instance = exhausted(entity_reader(Parent)(buffer.getbuffer()))
+    instance, size = entity_reader(Parent)(buffer.getbuffer(), 0)
 
+    assert size == buffer.tell()
     assert instance == Parent(
         name="Parent Name",
         children=(
@@ -70,21 +71,38 @@ def test_can_serialize_flexible_entity_array(buffer: io.BytesIO) -> None:
         ),
     )
     write_parent(buffer, instance)
+    offset = 0
+    buffer = buffer.getbuffer()
 
-    remaining, parent_name = read_compact_string(buffer.getbuffer())
+    parent_name, size = read_compact_string(buffer, offset)
+    offset += size
     assert parent_name == "Parent Name"
-    remaining, array_length = read_compact_array_length(remaining)
+
+    array_length, size = read_compact_array_length(buffer, offset)
+    offset += size
     assert array_length == 2
-    remaining, child_name = read_compact_string(remaining)
+
+    child_name, size = read_compact_string(buffer, offset)
+    offset += size
     assert child_name == "Child 1"
-    remaining, tagged_fields = read_unsigned_varint(remaining)
+
+    tagged_fields, size = read_unsigned_varint(buffer, offset)
+    offset += size
     assert tagged_fields == 0
-    remaining, child_name = read_compact_string(remaining)
+
+    child_name, size = read_compact_string(buffer, offset)
+    offset += size
     assert child_name == "Child 2"
-    remaining, tagged_fields = read_unsigned_varint(remaining)
+
+    tagged_fields, size = read_unsigned_varint(buffer, offset)
+    offset += size
     assert tagged_fields == 0
-    tagged_fields = exhausted(read_unsigned_varint(remaining))
+
+    tagged_fields, size = read_unsigned_varint(buffer, offset)
+    offset += size
     assert tagged_fields == 0
+
+    assert offset == len(buffer)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -102,8 +120,9 @@ def test_can_parse_flexible_primitive_array(buffer: io.BytesIO) -> None:
     write_uint8(buffer, u8(255))
     write_empty_tagged_fields(buffer)
 
-    instance = exhausted(entity_reader(Flat)(buffer.getbuffer()))
+    instance, size = entity_reader(Flat)(buffer.getbuffer(), 0)
 
+    assert size == buffer.tell()
     assert instance == Flat(values=(u8(123), u8(0), u8(255)))
 
 
@@ -111,14 +130,27 @@ def test_can_serialize_flexible_primitive_array(buffer: io.BytesIO) -> None:
     write_flat = entity_writer(Flat)
     instance = Flat(values=(u8(123), u8(0), u8(255)))
     write_flat(buffer, instance)
+    offset = 0
+    buffer = buffer.getbuffer()
 
-    remaining, array_length = read_compact_array_length(buffer.getbuffer())
+    array_length, size = read_compact_array_length(buffer, offset)
+    offset += size
     assert array_length == 3
-    remaining, value = read_uint8(remaining)
+
+    value, size = read_uint8(buffer, offset)
+    offset += size
     assert value == 123
-    remaining, value = read_uint8(remaining)
+
+    value, size = read_uint8(buffer, offset)
+    offset += size
     assert value == 0
-    remaining, value = read_uint8(remaining)
+
+    value, size = read_uint8(buffer, offset)
+    offset += size
     assert value == 255
-    tagged_fields = exhausted(read_unsigned_varint(remaining))
+
+    tagged_fields, size = read_unsigned_varint(buffer, offset)
+    offset += size
     assert tagged_fields == 0
+
+    assert offset == len(buffer)

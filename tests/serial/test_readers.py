@@ -525,21 +525,21 @@ class TestCompactArrayReader:
             q: str = field(metadata={"kafka_type": "string"})
 
         reader = compact_array_reader(entity_reader(A))
+        buffer = (
+            b"\x02"  # array length
+            b"\x17"  # A.p
+            b"\x08foo bar"  # A.q
+            b"\00"  # no tagged fields
+        )
         result, size = reader(
-            (
-                b"\x02"  # array length
-                b"\x17"  # A.p
-                b"\x08foo bar"  # A.q
-                b"\00"  # no tagged fields
-            ),
-            0,
+            buffer, 0
         )
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)
         assert entity.p == 23
         assert entity.q == "foo bar"
-        assert size == 0
+        assert size == len(buffer)
 
 
 class TestLegacyArrayReader:
@@ -571,20 +571,21 @@ class TestLegacyArrayReader:
             q: str = field(metadata={"kafka_type": "string"})
 
         reader = legacy_array_reader(entity_reader(A))
+        buffer = (
+            b"\x00\x00\x00\x01"  # array length
+            b"\x17"  # A.p
+            b"\x00\x07foo bar"  # A.q
+        )
         result, size = reader(
-            (
-                b"\x00\x00\x00\x01"  # array length
-                b"\x17"  # A.p
-                b"\x00\x07foo bar"  # A.q
-            ),
-            0,
+            buffer,
+            0
         )
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)
         assert entity.p == 23
         assert entity.q == "foo bar"
-        assert size == 0
+        assert size == len(buffer)
 
 
 class TestReadErrorCode:

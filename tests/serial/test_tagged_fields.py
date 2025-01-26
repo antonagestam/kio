@@ -85,7 +85,9 @@ def test_can_parse_tagged_fields(
             tagged_value.value,
         )
 
-    assert exhausted(read_person(buffer.getbuffer())) == expected
+    instance, size = read_person(buffer.getbuffer(), 0)
+    assert size == buffer.tell()
+    assert instance == expected
 
 
 def test_raises_type_error_when_missing_required_tagged_field(
@@ -101,7 +103,7 @@ def test_raises_type_error_when_missing_required_tagged_field(
         TypeError,
         match=r"missing 1 required keyword-only argument: 'age'",
     ):
-        read_person(buffer.getbuffer())
+        read_person(buffer.getbuffer(), 0)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -136,19 +138,27 @@ def test_can_serialize_tagged_fields(
     instance: Person,
     expected_tags: Sequence[ReadableTag],
 ) -> None:
+    offset = 0
     entity_writer(Person)(buffer, instance)
+    buffer = buffer.getbuffer()
 
-    remaining, name = read_compact_string(buffer.getbuffer())
+    name, size = read_compact_string(buffer, offset)
+    offset += size
 
+    assert size == len(name) + 1
     assert name == "Almaszout"  # name
 
-    remaining, num_tagged_values = read_unsigned_varint(remaining)
+    num_tagged_values, size = read_unsigned_varint(buffer, offset)
+    offset += size
     assert num_tagged_values == len(expected_tags)
     for expected_tag in expected_tags:
-        remaining, tag = read_unsigned_varint(remaining)
+        tag, size = read_unsigned_varint(buffer, offset)
+        offset += size
         assert tag == expected_tag.tag
-        remaining, _ = read_unsigned_varint(remaining)  # length
-        remaining, value = expected_tag.reader(remaining)
+        _, size = read_unsigned_varint(buffer, offset)  # length
+        offset += size
+        value, size = expected_tag.reader(buffer, offset)
+        offset += size
         assert value == expected_tag.value
 
-    assert remaining == b""
+    assert offset == len(buffer)
