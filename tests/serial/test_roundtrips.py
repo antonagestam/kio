@@ -167,7 +167,7 @@ TestLegacyArrayLengthRoundtrip = create_integer_roundtrip_test(
 TestCompactArrayLengthRoundtrip = create_integer_roundtrip_test(
     int_writer=write_compact_array_length,
     int_reader=read_compact_array_length,
-    min_value=-1,
+    min_value=0,
     max_value=2**31 - 2,
 )
 

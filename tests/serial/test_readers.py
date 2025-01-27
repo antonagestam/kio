@@ -17,7 +17,7 @@ from kio.serial import entity_reader
 from kio.serial.errors import BufferUnderflow
 from kio.serial.errors import OutOfBoundValue
 from kio.serial.errors import UnexpectedNull
-from kio.serial.readers import Reader
+from kio.serial.readers import Reader, read_compact_array_length
 from kio.serial.readers import SizedResult
 from kio.serial.readers import compact_array_reader
 from kio.serial.readers import legacy_array_reader
@@ -476,6 +476,14 @@ class TestReadLegacyBytes(LengthBufferUnderflowContract):
         result, size = self.read(buffer)
         assert result == byte_value
         assert size == 53
+
+
+class TestReadCompactArrayLength:
+    def test_reads_zero_as_none(self) -> None:
+        assert read_compact_array_length(b"\x00", 0) == (None, 1)
+
+    def test_returns_value_offset_by_one(self) -> None:
+        assert read_compact_array_length(b"\x01", 0) == (0, 1)
 
 
 class TestReadUUID(BufferUnderflowContract):
