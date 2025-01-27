@@ -20,7 +20,7 @@ from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import i32
 from kio.static.primitive import u8
-from tests.read_exhausted import exhausted
+from tests.read import exhaust, read
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -48,7 +48,7 @@ def test_can_parse_legacy_entity_array(buffer: io.BytesIO) -> None:
     # Second child
     write_legacy_string(buffer, "Child 2")
 
-    instance = exhausted(entity_reader(Parent)(buffer.getbuffer()))
+    instance = exhaust(entity_reader(Parent),buffer.getbuffer())
 
     assert instance == Parent(
         name="Parent Name",
@@ -70,13 +70,13 @@ def test_can_serialize_legacy_entity_array(buffer: io.BytesIO) -> None:
     )
     write_parent(buffer, instance)
 
-    remaining, parent_name = read_legacy_string(buffer.getbuffer())
+    parent_name, remaining = read(read_legacy_string,buffer.getbuffer())
     assert parent_name == "Parent Name"
-    remaining, array_length = read_legacy_array_length(remaining)
+    array_length, remaining = read(read_legacy_array_length,remaining)
     assert array_length == 2
-    remaining, value = read_legacy_string(remaining)
+    value, remaining = read(read_legacy_string,remaining)
     assert value == "Child 1"
-    value = exhausted(read_legacy_string(remaining))
+    value = exhaust(read_legacy_string, remaining)
     assert value == "Child 2"
 
 
@@ -94,7 +94,7 @@ def test_can_parse_legacy_primitive_array(buffer: io.BytesIO) -> None:
     write_uint8(buffer, u8(0))
     write_uint8(buffer, u8(255))
 
-    instance = exhausted(entity_reader(Flat)(buffer.getbuffer()))
+    instance = exhaust(entity_reader(Flat), buffer.getbuffer())
 
     assert instance == Flat(values=(u8(123), u8(0), u8(255)))
 
@@ -104,13 +104,13 @@ def test_can_serialize_legacy_primitive_array(buffer: io.BytesIO) -> None:
     instance = Flat(values=(u8(123), u8(0), u8(255)))
     write_flat(buffer, instance)
 
-    remaining, array_length = read_legacy_array_length(buffer.getbuffer())
+    array_length, remaining = read(read_legacy_array_length,buffer.getbuffer())
     assert array_length == 3
-    remaining, value = read_uint8(remaining)
+    value, remaining = read(read_uint8,remaining)
     assert value == 123
-    remaining, value = read_uint8(remaining)
+    value, remaining = read(read_uint8,remaining)
     assert value == 0
-    value = exhausted(read_uint8(remaining))
+    value = exhaust(read_uint8,remaining)
     assert value == 255
 
 

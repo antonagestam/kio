@@ -14,6 +14,7 @@ from typing import assert_type
 from unittest import mock
 
 import pytest
+from typing_extensions import Buffer
 
 import kio.schema.request_header.v0.header
 import kio.schema.request_header.v1.header
@@ -66,6 +67,7 @@ from kio.static.protocol import RequestPayload
 from kio.static.protocol import ResponsePayload
 
 from . import fixtures
+from .read import read
 
 pytestmark = pytest.mark.integration
 
@@ -140,7 +142,7 @@ class CorrelationIdMismatch(RuntimeError): ...
 
 async def read_response_bytes(stream: StreamReader) -> memoryview:
     response_length_bytes = memoryview(await stream.readexactly(4))
-    remaining, response_length = read_int32(response_length_bytes)
+    response_length, remaining = read(read_int32, response_length_bytes)
     assert remaining == b""
     return memoryview(await stream.readexactly(response_length))
 
@@ -149,19 +151,19 @@ R = TypeVar("R", bound=ResponsePayload)
 
 
 def parse_response(
-    buffer: memoryview,
+    buffer: Buffer,
     response_type: type[R],
     correlation_id: i32,
-) -> SizedResult[R]:
+) -> tuple[R, memoryview]:
     header_schema: Any = response_type.__header_schema__
     read_header = entity_reader(header_schema)
-    remaining, header = read_header(buffer)
+    header, remaining = read(read_header,buffer)
 
     if header.correlation_id != correlation_id:
         raise CorrelationIdMismatch
 
     read_payload = entity_reader(response_type)
-    return read_payload(remaining)
+    return read(read_payload,remaining)
 
 
 async def make_request(
@@ -184,7 +186,7 @@ async def make_request(
     # After this point, the connection is closed, and we're synchronously reading the
     # response from the in-memory buffer.
     with response_bytes as open_message_buffer:
-        remaining, response = parse_response(
+        response, remaining = parse_response(
             open_message_buffer,
             response_type,
             correlation_id,
