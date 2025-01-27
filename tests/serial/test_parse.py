@@ -32,7 +32,6 @@ from kio.serial.writers import write_uuid
 from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import i32
-from tests.read_exhausted import exhausted
 
 
 class TestGetReader:

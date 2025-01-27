@@ -210,6 +210,9 @@ fn internal_read_compact_string_as_bytes(bytes: &[u8]) -> SizedResult<&[u8]> {
         Ok((length, byte_offset)) => {
             // String length is encoded with an offset of 1, to allow encoding null as 0.
             let byte_end = byte_offset + length - 1;
+            if bytes.len() < byte_end {
+                return error_buffer_exhausted();
+            }
             let sliced = &bytes[byte_offset..byte_end];
             Ok((sliced, byte_end))
         }
@@ -232,6 +235,9 @@ fn internal_read_compact_string_as_bytes_nullable(bytes: &[u8]) -> SizedResult<O
         Ok((length, byte_offset)) => {
             // String length is encoded with an offset of 1, to allow encoding null as 0.
             let byte_end = byte_offset + length - 1;
+            if bytes.len() < byte_end {
+                return error_buffer_exhausted();
+            }
             let sliced = &bytes[byte_offset..byte_end];
             Ok((Some(sliced), byte_end))
         }
@@ -312,6 +318,20 @@ fn internal_read_int16_as_usize(bytes: &[u8]) -> SizedResult<Option<usize>> {
     }
 }
 
+fn internal_read_int32_as_usize(bytes: &[u8]) -> SizedResult<Option<usize>> {
+    const NULL_VALUE: i32 = -1;
+    match internal_read_int32(bytes) {
+        Ok((NULL_VALUE, offset)) => Ok((None, offset)),
+        Ok((length, offset)) => match usize::try_from(length) {
+            Ok(length) => Ok((Some(length), offset)),
+            Err(_) => Err(kio_errors::NegativeByteLength::new_err(
+                "Found negative byte length",
+            )),
+        },
+        Err(error) => Err(error),
+    }
+}
+
 fn slice_legacy_bytes(bytes: &[u8], offset: usize, length: usize) -> SizedResult<&[u8]> {
     let byte_end = offset + length;
     if bytes.len() < byte_end {
@@ -321,7 +341,7 @@ fn slice_legacy_bytes(bytes: &[u8], offset: usize, length: usize) -> SizedResult
 }
 
 fn internal_read_legacy_bytes(bytes: &[u8]) -> SizedResult<&[u8]> {
-    match internal_read_int16_as_usize(bytes) {
+    match internal_read_int32_as_usize(bytes) {
         Ok((Some(length), offset)) => slice_legacy_bytes(bytes, offset, length),
         Ok((None, _)) => Err(kio_errors::UnexpectedNull::new_err(
             "Unexpectedly read null where compact string/bytes was expected",
@@ -336,7 +356,7 @@ pub fn read_legacy_bytes(py: Python, buffered: Py<PyAny>, offset: usize) -> Size
 }
 
 fn internal_read_nullable_legacy_bytes(bytes: &[u8]) -> SizedResult<Option<&[u8]>> {
-    match internal_read_int16_as_usize(bytes) {
+    match internal_read_int32_as_usize(bytes) {
         Ok((None, offset)) => Ok((None, offset)),
         Ok((Some(length), offset)) => {
             let (sliced_bytes, offset) = slice_legacy_bytes(bytes, offset, length)?;
@@ -399,13 +419,11 @@ pub fn read_legacy_array_length(
     internal_read_int32(data_from_input(py, buffered, offset)?)
 }
 
-fn internal_read_compact_array_length(bytes: &[u8]) -> SizedResult<usize> {
+fn internal_read_compact_array_length(bytes: &[u8]) -> SizedResult<Option<usize>> {
     match internal_read_unsigned_varint(bytes) {
-        Ok((0, _)) => Err(kio_errors::NegativeByteLength::new_err(
-            "Found negative array length",
-        )),
+        Ok((0, offset)) => Ok((None, offset)),
         // Kafka uses the array size plus 1.
-        Ok((value, offset)) => Ok((value - 1, offset)),
+        Ok((value, offset)) => Ok((Some(value - 1), offset)),
         Err(error) => Err(error),
     }
 }
@@ -415,7 +433,7 @@ pub fn read_compact_array_length(
     py: Python,
     buffered: Py<PyAny>,
     offset: usize,
-) -> SizedResult<usize> {
+) -> SizedResult<Option<usize>> {
     internal_read_compact_array_length(data_from_input(py, buffered, offset)?)
 }
 

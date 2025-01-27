@@ -21,7 +21,7 @@ from kio.serial import writers
 from kio.serial._serialize import get_field_writer
 from kio.serial._serialize import get_writer
 from kio.serial._shared import NullableEntityMarker
-from kio.serial.readers import read_boolean, Reader
+from kio.serial.readers import read_boolean
 from kio.serial.readers import read_compact_array_length
 from kio.serial.readers import read_compact_string
 from kio.serial.readers import read_compact_string_nullable
@@ -35,8 +35,8 @@ from kio.static.primitive import i8
 from kio.static.primitive import i16
 from kio.static.primitive import i32
 from kio.static.primitive import i32Timedelta
-from tests.read import read, exhaust
-from tests.read_exhausted import exhausted
+from tests.read import exhaust
+from tests.read import read
 
 
 class TestGetWriter:
@@ -243,7 +243,7 @@ class TestGetFieldWriter:
         assert value == 23
         tags, remaining = read(read_unsigned_varint, remaining)
         assert tags == 0
-        marker_value= exhaust(read_int8, remaining)
+        marker_value = exhaust(read_int8, remaining)
         assert NullableEntityMarker(marker_value) is NullableEntityMarker.null
 
     def test_returns_entity_tuple_writer_for_entity_tuple_field(
@@ -407,7 +407,7 @@ def test_serialize_complex_entity(buffer: io.BytesIO) -> None:
         assert topic_tagged_fields == 0
 
     # main entity tagged fields
-    assert exhaust(read_unsigned_varint,remaining) == 0
+    assert exhaust(read_unsigned_varint, remaining) == 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

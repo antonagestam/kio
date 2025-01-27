@@ -23,7 +23,6 @@ from kio.serial.writers import write_unsigned_varint
 from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import u8
-from tests.read_exhausted import exhausted
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

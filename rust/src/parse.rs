@@ -58,3 +58,11 @@ pub fn get_reader(
         PyModule::import(py, "_kio_core")?.getattr(reader_name)?.into()
     )
 }
+
+
+// #[pyfunction]
+// pub fn entity_reader(
+//     py: Python,
+//     entity_type:
+//     nullable: bool,
+// ) -> PyResult<Py<PyAny>> {

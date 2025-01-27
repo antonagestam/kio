@@ -229,10 +229,17 @@ def read_nullable_legacy_string(
 read_legacy_array_length: Final = read_int32
 
 
-def read_compact_array_length(buffer: Buffer, offset: int, /) -> SizedResult[int]:
+def read_compact_array_length(
+    buffer: Buffer,
+    offset: int,
+    /,
+) -> SizedResult[int | None]:
     encoded_length, size = read_unsigned_varint(buffer, offset)
     # Apache Kafka® uses the array size plus 1.
-    return encoded_length - 1, size
+    decoded = encoded_length - 1
+    if decoded == -1:
+        return None, size
+    return decoded, size
 
 
 @_take_bytes(16)
@@ -278,7 +285,7 @@ def compact_array_reader(item_reader: Reader[T]) -> Reader[tuple[T, ...] | None]
         buffer: Buffer, offset: int, /
     ) -> SizedResult[tuple[T, ...] | None]:
         length, length_size = read_compact_array_length(buffer, offset)
-        if length == -1:
+        if length is None:
             return None, length_size
         items, items_size = _materialize_and_return(
             _read_length_items(item_reader, length, buffer, offset + length_size)

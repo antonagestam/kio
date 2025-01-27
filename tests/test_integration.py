@@ -14,6 +14,7 @@ from typing import assert_type
 from unittest import mock
 
 import pytest
+
 from typing_extensions import Buffer
 
 import kio.schema.request_header.v0.header
@@ -52,7 +53,6 @@ from kio.schema.types import TopicName
 from kio.schema.types import TransactionalId
 from kio.serial import entity_reader
 from kio.serial import entity_writer
-from kio.serial.readers import SizedResult
 from kio.serial.readers import read_int32
 from kio.serial.writers import Writable
 from kio.serial.writers import write_int32
@@ -157,13 +157,13 @@ def parse_response(
 ) -> tuple[R, memoryview]:
     header_schema: Any = response_type.__header_schema__
     read_header = entity_reader(header_schema)
-    header, remaining = read(read_header,buffer)
+    header, remaining = read(read_header, buffer)
 
     if header.correlation_id != correlation_id:
         raise CorrelationIdMismatch
 
     read_payload = entity_reader(response_type)
-    return read(read_payload,remaining)
+    return read(read_payload, remaining)
 
 
 async def make_request(

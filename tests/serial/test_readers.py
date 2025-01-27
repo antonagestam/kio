@@ -531,9 +531,7 @@ class TestCompactArrayReader:
             b"\x08foo bar"  # A.q
             b"\00"  # no tagged fields
         )
-        result, size = reader(
-            buffer, 0
-        )
+        result, size = reader(buffer, 0)
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)
@@ -576,10 +574,7 @@ class TestLegacyArrayReader:
             b"\x17"  # A.p
             b"\x00\x07foo bar"  # A.q
         )
-        result, size = reader(
-            buffer,
-            0
-        )
+        result, size = reader(buffer, 0)
         assert result is not None
         [entity] = result
         assert isinstance(entity, A)

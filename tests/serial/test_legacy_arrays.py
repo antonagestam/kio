@@ -20,7 +20,8 @@ from kio.static.constants import EntityType
 from kio.static.primitive import i16
 from kio.static.primitive import i32
 from kio.static.primitive import u8
-from tests.read import exhaust, read
+from tests.read import exhaust
+from tests.read import read
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -48,7 +49,7 @@ def test_can_parse_legacy_entity_array(buffer: io.BytesIO) -> None:
     # Second child
     write_legacy_string(buffer, "Child 2")
 
-    instance = exhaust(entity_reader(Parent),buffer.getbuffer())
+    instance = exhaust(entity_reader(Parent), buffer.getbuffer())
 
     assert instance == Parent(
         name="Parent Name",
@@ -70,11 +71,11 @@ def test_can_serialize_legacy_entity_array(buffer: io.BytesIO) -> None:
     )
     write_parent(buffer, instance)
 
-    parent_name, remaining = read(read_legacy_string,buffer.getbuffer())
+    parent_name, remaining = read(read_legacy_string, buffer.getbuffer())
     assert parent_name == "Parent Name"
-    array_length, remaining = read(read_legacy_array_length,remaining)
+    array_length, remaining = read(read_legacy_array_length, remaining)
     assert array_length == 2
-    value, remaining = read(read_legacy_string,remaining)
+    value, remaining = read(read_legacy_string, remaining)
     assert value == "Child 1"
     value = exhaust(read_legacy_string, remaining)
     assert value == "Child 2"
@@ -104,13 +105,13 @@ def test_can_serialize_legacy_primitive_array(buffer: io.BytesIO) -> None:
     instance = Flat(values=(u8(123), u8(0), u8(255)))
     write_flat(buffer, instance)
 
-    array_length, remaining = read(read_legacy_array_length,buffer.getbuffer())
+    array_length, remaining = read(read_legacy_array_length, buffer.getbuffer())
     assert array_length == 3
-    value, remaining = read(read_uint8,remaining)
+    value, remaining = read(read_uint8, remaining)
     assert value == 123
-    value, remaining = read(read_uint8,remaining)
+    value, remaining = read(read_uint8, remaining)
     assert value == 0
-    value = exhaust(read_uint8,remaining)
+    value = exhaust(read_uint8, remaining)
     assert value == 255
 
 

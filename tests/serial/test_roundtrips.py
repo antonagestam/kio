@@ -57,8 +57,8 @@ from kio.serial.writers import write_uint32
 from kio.serial.writers import write_uint64
 from kio.serial.writers import write_unsigned_varint
 from kio.serial.writers import write_uuid
-from tests.read import read, exhaust
-from tests.read_exhausted import exhausted
+from tests.read import exhaust
+from tests.read import read
 
 pytestmark = pytest.mark.roundtrip
 
@@ -98,7 +98,7 @@ def create_integer_roundtrip_test(
 
             parsed_a, remaining = read(int_reader, buffer.getbuffer())
             assert parsed_a == a
-            parsed_b = exhaust(int_reader,remaining)
+            parsed_b = exhaust(int_reader, remaining)
             assert parsed_b == b
 
     return Test
